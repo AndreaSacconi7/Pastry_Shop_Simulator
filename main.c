@@ -315,6 +315,7 @@ void appendToInternalList(InternalList* list, Batch* newNode) {
             currentBatch = currentBatch -> next;
         }else {
             if(last == NULL) {
+                newNode -> next = list -> head;
                 list -> head = newNode;
             }else {
                 last -> next = newNode;
@@ -325,6 +326,7 @@ void appendToInternalList(InternalList* list, Batch* newNode) {
     }
     //inserimento in coda dopo aver scorso tutta la lista
     if(last == NULL) {
+        newNode -> next = list -> head;
         list -> head = newNode;
     }else {
         last -> next = newNode;
@@ -363,6 +365,7 @@ void insertBatchInWareHouse(ListOfList* listOfLists, Batch* newBatch) {
         InternalList* newInternalList = createInternalList();
         appendToInternalList(newInternalList, newBatch);
         appendToListOfLists(last, newInternalList, listOfLists);
+        return;
     }
 
     while (temp != NULL) {
@@ -407,7 +410,8 @@ void appendOrderInReadyQueue(Order* newOrder, Queue* readyQueue) {
 
     if(readyQueue -> head == NULL) {
         readyQueue -> tail = newOrder;
-        readyQueue -> head = readyQueue -> tail;
+        readyQueue -> head = newOrder;
+        newOrder -> next = NULL;
         return;
     }
 
@@ -432,11 +436,14 @@ void appendOrderInReadyQueue(Order* newOrder, Queue* readyQueue) {
     }
 
     if(last == NULL) {
+        //inserimento in testa che non si dovrebbe verificare perchè coperto da if all'inizio
         readyQueue -> head = newOrder;
         newOrder -> next = currentOrder;
+        readyQueue -> head = newOrder;
     }else {
         last -> next = newOrder;
         newOrder -> next = NULL;
+        readyQueue -> tail = newOrder;
     }
 }
 
@@ -445,6 +452,8 @@ void removeOrderInQueue(Queue* queue) {
     if(queue -> head != NULL) {
         Order* head = queue -> head;
         queue -> head = head -> next;
+        if(queue -> head == NULL)
+            queue -> tail = NULL;
         free(head);
     }
 }
@@ -470,13 +479,79 @@ Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
     return NULL;
 }
 
+//restituisco 0 se non c'è nulla da sistemare
+//restituisco 1 se ho sistemato quantity
+//restituisco 2 se cancello batch e cancello listNode (testa di listOfLists e non ci sono altri elementi in magazzino)
+//restituisco 3 se cancello batch e cancello listNode (non in testa di listOfLists)
+//restituisco 4 se cancello batch
+//restituisco 5 se cancello batch e cancello listNode (testa di listOfLists ma ci sono altri elementi in magazzino)
+int fixBatchWareHouse(Batch* currentBatch, Batch* lastBatch, ListNode* currentNode, ListNode* lastNode, ListOfList* wareHouseListofLists) {
+
+    //se nella chiamata del metodo precedente ho tolto (virtualmente)
+    if(currentBatch -> quantityLeft < currentBatch -> quantity) {
+        if(currentBatch -> quantityLeft <= 0) {
+            Batch* temp = NULL;
+            //cancello nodo
+            if(lastBatch == NULL) {
+                //devo cancellare il nodo in testa
+                //oltre cancellare il nodo in testa cancello anche il currentNode perchè la sua lista ormai sarà vuota
+                temp = currentBatch;
+                ListNode* tempNode = NULL;
+                //controllo se siamo in cima alla lista di liste
+                if(lastNode == NULL) {
+                    //currentNode è la testa
+                    if(currentNode -> next == NULL) {
+                        //sono in cima alla lista di liste e non ci sono più altri elementi oltre la testa che sto per rimuovere
+                        wareHouseListofLists -> head = NULL;
+                        tempNode = currentNode;
+                        free(tempNode);
+                        //currentNode = NULL;
+                        free(temp);
+                        //currentBatch = NULL;
+                        return 2;
+                    }else {
+                        wareHouseListofLists -> head = currentNode -> next;
+                        tempNode = currentNode;
+                        free(tempNode);
+                        free(temp);
+                        return 5;
+                    }
+
+                }else {
+                    //non sono in cima alla lista di liste
+                    tempNode = currentNode;
+                    lastNode -> next = currentNode -> next;
+                    free(tempNode);
+                    //currentNode = lastNode;
+                    free(temp);
+                    //currentBatch = NULL;
+                    return 3;
+                }
+            }else {
+                temp = currentBatch;
+                lastBatch -> next = currentBatch -> next;
+                //currentBatch = currentBatch -> next;
+                free(temp);
+                return 4;
+            }
+        }else {
+            //modifico quantity poichè la quantità è diminuita ma non è finita
+            currentBatch -> quantity = currentBatch -> quantityLeft;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 bool checkIfIngredientIsPresentInNotModifiedWareHouse(ListOfList* wareHouseListofLists, Order* order, int currentTime) {
 
     ListNode* currentNode = wareHouseListofLists -> head;
+    ListNode* lastNode = NULL;
     Node* currentIngredient = order -> ingredientList -> head;
     int quantityOrder = order -> quantity;
     bool ingredientFound = false;
-    Batch* last = NULL;
+    Batch* lastBatch = NULL;
+    int result = 0;
 
     while (currentNode != NULL && currentIngredient != NULL) {
         int cmp = strcmp(currentNode -> list -> head -> ingredient, currentIngredient -> ingredientName);
@@ -494,28 +569,45 @@ bool checkIfIngredientIsPresentInNotModifiedWareHouse(ListOfList* wareHouseListo
                     if(quantityToFind <= 0)
                         ingredientFound = true;
 
-                    last = currentBatch;
+                    lastBatch = currentBatch;
                     currentBatch = currentBatch -> next;
                 }else {
-                    //cancello nodo scaduto
-                    Batch* temp = NULL;
-                    if(last == NULL) {
-                        temp = currentBatch;
-                        currentNode -> list -> head = currentBatch -> next;
+                    //cancello nodo scaduto in base alla casistica
+                    currentBatch -> quantityLeft = 0;
+                    //chiamo metodo fix per cancellare il batch e eventualemnte il currentNode se rimane vuoto
+                    result = fixBatchWareHouse(currentBatch, lastBatch, currentNode, lastNode, wareHouseListofLists);
+                    switch (result) {
+                    case 2:
+                        lastNode = NULL;
+                        currentNode = NULL;
+                        currentBatch = NULL;
+                        lastBatch = NULL;
+                        break;
+                    case 3:
+                        currentNode = lastNode;
+                        currentBatch = NULL;
+                        lastBatch = NULL;
+                        break;
+                    case 4:
                         currentBatch = currentBatch -> next;
-                        free(temp);
-                    }else {
-                        temp = currentBatch;
-                        last -> next = currentBatch -> next;
-                        currentBatch = currentBatch -> next;
-                        free(temp);
+                        break;
+                    case 5:
+                        currentNode = wareHouseListofLists -> head;
+                        //lastNode rimane invariato
+                        lastNode = NULL;
+                        currentBatch = NULL;
+                        lastBatch = NULL;
+                        break;
+                    default:
+                        printf("error in fix");
+                        break;
                     }
                 }
             }
 
             if(ingredientFound){
                 //sommo i pesi degli ingredienti
-                order -> weight = order -> weight + currentIngredient -> quantity;
+                order -> weight = order -> weight + (currentIngredient -> quantity * quantityOrder);
                 currentIngredient = currentIngredient -> next;
                 ingredientFound = false;
             }else {
@@ -528,109 +620,153 @@ bool checkIfIngredientIsPresentInNotModifiedWareHouse(ListOfList* wareHouseListo
             order -> weight = 0;
             return false;
         }
+
+        lastNode = currentNode;
         currentNode = currentNode -> next;
+
     }
     //tutti gli ingredienti trovati
     //prima di restituire true devo cancellare tutti i batch che utilizzo per preparare l'ordine
-    wareHouseListofLists -> modified = true;
-    return true;
-}
-
-bool fixBatchWareHouse(Batch* currentBatch, Batch* last, ListNode* currentNode) {
-
-    //se nella chiamata del metodo precedente ho tolto (virtualmente)
-    if(currentBatch -> quantityLeft < currentBatch -> quantity) {
-        if(currentBatch -> quantityLeft <= 0) {
-            Batch* temp = NULL;
-            //cancello nodo
-            if(last == NULL) {
-                temp = currentBatch;
-                currentNode -> list -> head = currentBatch -> next;
-                free(temp);
-            }else {
-                temp = currentBatch;
-                last -> next = currentBatch -> next;
-                currentBatch = currentBatch -> next;
-                free(temp);
-            }
-        }else {
-            //modifico quantity poichè la quantità è diminuita ma non è finita
-            currentBatch -> quantity = currentBatch -> quantityLeft;
-        }
+    if(currentIngredient == NULL) {
+        wareHouseListofLists -> modified = true;
         return true;
+    }else {
+        return false;
     }
-    return false;
 }
 
 bool checkIfIngredientIsPresentInModifiedWareHouse(ListOfList* wareHouseListofLists, Order* order, int currentTime) {
 
     ListNode* currentNode = wareHouseListofLists -> head;
+    ListNode* lastNode = NULL;
     Node* currentIngredient = order -> ingredientList -> head;
     int quantityOrder = order -> quantity;
     bool ingredientFound = false;
-    Batch* last = NULL;
-    bool orderPrepared = true;
+    Batch* lastBatch = NULL;
+    int numberIngredientToFind = 1;
+    int numberIngredientFound = 0;
 
     while (currentNode != NULL && currentIngredient != NULL) {
-        if(currentNode -> list -> head != NULL){
-            int cmp = strcmp(currentNode -> list -> head -> ingredient, currentIngredient -> ingredientName);
-            Batch* currentBatch = currentNode -> list -> head;
-            if(cmp == 0) {
-                last = NULL;
-                //se per preparare 1 torta mi servono 2 uova. per prepararne X mi servono 2*X uova
-                int quantityToFind = currentIngredient -> quantity * quantityOrder;
-                while(!ingredientFound && currentBatch != NULL) {
 
-                    //entro nell'if solo se non ho sistemato il batch con il metodo fix
-                    if(!fixBatchWareHouse(currentBatch, last, currentNode)){
-                        //se avevo modificato quantityLeft ma poi non ho realmente tolto gli ingredienti dal magazzino rispristino il valore iniziale
-                        currentBatch -> quantityLeft = currentBatch -> quantity;
-                        if(currentBatch -> expiration > currentTime) {
-                            currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
-                            quantityToFind = quantityToFind - currentBatch -> quantity;
-                            if(quantityToFind <= 0)
-                                ingredientFound = true;
-                        }else {
-                            //cancello nodo scaduto
-                            currentBatch -> quantityLeft = 0;
+        int cmp = strcmp(currentNode -> list -> head -> ingredient, currentIngredient -> ingredientName);
+        Batch* currentBatch = currentNode -> list -> head;
+        if(cmp == 0) {
+            lastBatch = NULL;
+            //se per preparare 1 torta mi servono 2 uova. per prepararne X mi servono 2*X uova
+            int quantityToFind = currentIngredient -> quantity * quantityOrder;
+            while(!ingredientFound && currentBatch != NULL) {
+
+                //entro nell'if solo se non ho sistemato il batch con il metodo fix
+                if(fixBatchWareHouse(currentBatch, lastBatch, currentNode, lastNode, wareHouseListofLists) != 0){
+                    //se avevo modificato quantityLeft ma poi non ho realmente tolto gli ingredienti dal magazzino rispristino il valore iniziale
+                    currentBatch -> quantityLeft = currentBatch -> quantity;
+                    if(currentBatch -> expiration > currentTime) {
+                        currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
+                        quantityToFind = quantityToFind - currentBatch -> quantity;
+                        if(quantityToFind <= 0)
+                            ingredientFound = true;
+
+                    }else {
+                        //cancello nodo scaduto in base alla casistica
+                        currentBatch -> quantityLeft = 0;
+                        //chiamo metodo fix per cancellare il batch e eventualemnte il currentNode se rimane vuoto
+                        int result = fixBatchWareHouse(currentBatch, lastBatch, currentNode, lastNode, wareHouseListofLists);
+                        switch (result) {
+                        case 2:
+                            lastNode = NULL;
+                            currentNode = NULL;
+                            currentBatch = NULL;
+                            lastBatch = NULL;
+                            break;
+                        case 3:
+                            currentNode = lastNode;
+                            currentBatch = NULL;
+                            lastBatch = NULL;
+                            break;
+                        case 4:
+                            currentBatch = currentBatch -> next;
+                            break;
+                        case 5:
+                            currentNode = wareHouseListofLists -> head;
+                            //lastNode rimane invariato
+                            lastNode = NULL;
+                            currentBatch = NULL;
+                            lastBatch = NULL;
+                            break;
+                        default:
+                            printf("error in fix");
+                            break;
                         }
-                        last = currentBatch;
-                        currentBatch = currentBatch -> next;
                     }
                 }
+                lastBatch = currentBatch;
+                if(currentBatch != NULL)
+                    currentBatch = currentBatch -> next;
+            }
 
-                if(ingredientFound){
-                    //sommo i pesi degli ingredienti
-                    order -> weight = order -> weight + (currentIngredient -> quantity * quantityOrder);
-                    currentIngredient = currentIngredient -> next;
-                    ingredientFound = false;
-                }else {
-                    order -> weight = 0;
-                    orderPrepared = false;
-                }
+            if(ingredientFound){
+                //sommo i pesi degli ingredienti
+                numberIngredientFound++;
+                order -> weight = order -> weight + (currentIngredient -> quantity * quantityOrder);
+                currentIngredient = currentIngredient -> next;
+                if(currentIngredient != NULL)
+                    numberIngredientToFind++;
+                ingredientFound = false;
+            }else {
+                order -> weight = 0;
+                //orderPrepared = false;
+            }
 
-            }else{
-                last = NULL;
-                while(currentBatch != NULL) {
-                    if(!fixBatchWareHouse(currentBatch, last, currentNode)) {
-                        last = currentBatch;
+        }else{
+            lastBatch = NULL;
+            while(currentBatch != NULL) {
+                //cancello nodo scaduto in base alla casistica
+                currentBatch -> quantityLeft = 0;
+                //chiamo metodo fix per cancellare il batch e eventualemnte il currentNode se rimane vuoto
+                int result = fixBatchWareHouse(currentBatch, lastBatch, currentNode, lastNode, wareHouseListofLists);
+                switch (result) {
+                    case 2:
+                        lastNode = NULL;
+                        currentNode = NULL;
+                        currentBatch = NULL;
+                        lastBatch = NULL;
+                        break;
+                    case 3:
+                        currentNode = lastNode;
+                        currentBatch = NULL;
+                        lastBatch = NULL;
+                        break;
+                    case 4:
                         currentBatch = currentBatch -> next;
-                    }
+                        break;
+                    case 5:
+                        currentNode = wareHouseListofLists -> head;
+                        //lastNode rimane invariato
+                        lastNode = NULL;
+                        currentBatch = NULL;
+                        lastBatch = NULL;
+                        break;
+                    default:
+                        printf("error in fix");
+                        break;
                 }
-                if(cmp > 0) {
-                    //non è presente alcun lotto del ingrediente cercato
-                    orderPrepared = false;
-                }
+                lastBatch = currentBatch;
+                if(currentBatch != NULL)
+                    currentBatch = currentBatch -> next;
             }
         }
-        currentNode = currentNode -> next;
+        lastNode = currentNode;
+        if(currentNode != NULL) {
+            currentNode = currentNode -> next;
+        }
     }
     //in base a orderPrepared capisco se ho trovato tutti gli ingredienti oppure no
     //prima di restituire true devo cancellare tutti i batch che utilizzo per preparare l'ordine
-    wareHouseListofLists -> modified = false;
-    if(orderPrepared && currentIngredient == NULL) {
+    if(currentIngredient == NULL && numberIngredientFound == numberIngredientToFind) {
+        wareHouseListofLists -> modified = true;
         return true;
     }else {
+        wareHouseListofLists -> modified = false;
         order -> weight = 0;
         return false;
     }
@@ -665,17 +801,18 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
     //se un ordine è preparabile rimuovo gli ingredienti dai batch e sposto l'ordine nella coda degli ordini pronti
     Order* currentOrder = waitQueue -> head;
     Order* last = NULL;
-    bool modifiedNow = false;
+    //bool modifiedNow = false;
 
     while (currentOrder != NULL) {
 
         //itero sugli ingredienti e controllo con checkIfIngredientIsPresentInWarehouse se sono tutti presenti
         //se sono tutti presenti sposto l'ordine in readyQueue e rimuovo gli ingredienti dal magazzino
         if(checkIfIngredientIsPresentInWareHouse(listOfLists, currentOrder, currentTime)) {
-            modifiedNow = true;
+            //modifiedNow = true;
             //sistemo lista waitQueue
             if(last == NULL){
                 waitQueue -> head = currentOrder -> next;
+                waitQueue -> tail = currentOrder -> next;
             }else {
                 last -> next = currentOrder -> next;
             }
@@ -690,26 +827,18 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
         currentOrder = currentOrder -> next;
     }
     //se almeno un ordine viene processato pongo il magazzino a modificato altrimenti a false
+    /*
     if(modifiedNow == true) {
         listOfLists -> modified = true;
     }else {
         listOfLists -> modified = false;
     }
+    */
 }
 
 bool prepareSingleOrder(ListOfList* listofLists, Order* order, int currentTime) {
 
-    bool modifiedNow = false;
-    if(checkIfIngredientIsPresentInWareHouse(listofLists, order, currentTime)) {
-        modifiedNow = true;
-    }
-    //se almeno un ordine viene processato pongo il magazzino a modificato altrimenti a false
-    if(modifiedNow == true) {
-        listofLists -> modified = true;
-    }else {
-        listofLists -> modified = false;
-    }
-    return modifiedNow;
+    return checkIfIngredientIsPresentInWareHouse(listofLists, order, currentTime);
 }
 
 void removeNewline(char *str) {
@@ -835,8 +964,6 @@ void UTILS_commandsHandler() {
     while (fgets(commandBuffer, COMMAND_BUFFER_SIZE, stdin)) {
         if(currentTime != 0 && currentTime % periodicity == 0) {
             //arriva il furgone
-            //controllo se gli ordini in attesa possono essere preparati
-            prepareOrder(waitQueue, readyQueue, listOfLists, currentTime);
             //lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
             fillVan(capacity, readyQueue);
         }
@@ -887,6 +1014,8 @@ void UTILS_commandsHandler() {
                 //inserisco Batch nel magazzino (hash table)
                 insertBatchInWareHouse(listOfLists, batch);
             }
+            //controllo se gli ordini in attesa possono essere preparati
+            prepareOrder(waitQueue, readyQueue, listOfLists, currentTime);
             printf("rifornito\n");
             break;
         case ordine_HASH:
