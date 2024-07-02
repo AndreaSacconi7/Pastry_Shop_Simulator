@@ -47,13 +47,23 @@ typedef struct Batch {
     char* ingredient;
     int expiration;
     int quantity;
+    int quantityLeft;
     struct Batch* next;
 } Batch;
+
+typedef struct UsedBatch {
+    Batch* batch;
+    struct UsedBatch* next;
+    struct UsedBatch* previous;
+} UsedBatch;
+
+typedef struct UsedBatchList {
+    UsedBatch* head;
+} UsedBatchList;
 
 // Struttura per la lista interna con puntatori a head e tail
 typedef struct InternalList {
     Batch* head;
-    Batch* tail;
 } InternalList;
 
 // Struttura per il nodo della lista esterna
@@ -65,6 +75,7 @@ typedef struct ListNode {
 //lista di lotti (magazzino)
 typedef struct ListOfList {
     ListNode* head;            //lotto con scadenza più vicina (dove estraggo)
+    bool modified;
 } ListOfList;
 
 typedef struct Order {
@@ -147,6 +158,34 @@ Queue* createQueue() {
     newQueue -> head = NULL;
     newQueue -> tail = NULL;
     return newQueue;
+}
+
+UsedBatch* createUsedBatch(Batch* batch) {
+    UsedBatch* newUsedBatch = (UsedBatch*)malloc(sizeof(UsedBatch));
+    if(!newUsedBatch) {
+        printf("Errore di allocazione della memoria\n");
+        exit(1);
+    }
+    newUsedBatch -> batch = batch;
+    newUsedBatch -> next = NULL;
+    newUsedBatch -> previous = NULL;
+}
+
+UsedBatchList* createUsedBatchList() {
+    UsedBatchList* usedBatchList = (UsedBatchList*)malloc(sizeof(UsedBatchList));
+    if(!usedBatchList) {
+        printf("Errore di allocazione della memoria\n");
+        exit(1);
+    }
+    usedBatchList -> head = NULL;
+}
+
+void appendUsedBatchToUsedList(UsedBatch* usedBatch, UsedBatchList* usedBatchList) {
+
+    //inserisco in testa
+    UsedBatch* temp = usedBatchList -> head;
+    usedBatchList -> head = usedBatch;
+    usedBatch -> next = temp;
 }
 
 void appendIngredientToList(Node* newNode, List* list){
@@ -232,6 +271,7 @@ Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
     newBatch -> ingredient = strdup(ingredient);
     newBatch -> expiration = expiration;
     newBatch -> quantity = quantity;
+    newBatch -> quantityLeft = quantity;
     newBatch -> next = NULL;
 
     return newBatch;
@@ -244,7 +284,6 @@ InternalList* createInternalList() {
         exit(1);
     }
     newList->head = NULL;
-    newList->tail = NULL;
     return newList;
 }
 
@@ -254,19 +293,42 @@ ListOfList* createListOfLists() {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
-    newListOfLists->head = NULL;
+    newListOfLists -> head = NULL;
+    newListOfLists -> modified = false;
     return newListOfLists;
 }
 
+//la internal list viene ordinata in ordine di expiration
+//scadenza più vicina -> scadenza più lontana
 void appendToInternalList(InternalList* list, Batch* newNode) {
 
     if (list->head == NULL) {
         list->head = newNode;
-        list->tail = newNode;
-    } else {
-        //aggiunge il nuovo nodo in coda
-        list->tail->next = newNode;
-        list->tail = newNode;
+    }
+
+    Batch* currentBatch = list -> head;
+    Batch* last = NULL;
+
+    while(currentBatch != NULL) {
+        if(currentBatch -> expiration <= newNode -> expiration) {
+            last = currentBatch;
+            currentBatch = currentBatch -> next;
+        }else {
+            if(last == NULL) {
+                list -> head = newNode;
+            }else {
+                last -> next = newNode;
+                newNode -> next = currentBatch;
+            }
+            return;
+        }
+    }
+    //inserimento in coda dopo aver scorso tutta la lista
+    if(last == NULL) {
+        list -> head = newNode;
+    }else {
+        last -> next = newNode;
+        newNode -> next = currentBatch;
     }
 }
 
@@ -408,27 +470,56 @@ Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
     return NULL;
 }
 
-bool checkIfIngredientIsPresentInWareHouse(ListOfList* wareHouseListofLists, Order* order) {
+bool checkIfIngredientIsPresentInWareHouse(ListOfList* wareHouseListofLists, Order* order, int currentTime) {
 
     ListNode* currentNode = wareHouseListofLists -> head;
     Node* currentIngredient = order -> ingredientList -> head;
     int quantityOrder = order -> quantity;
     bool ingredientFound = false;
+    Batch* last = NULL;
 
     while (currentNode != NULL && currentIngredient != NULL) {
         int cmp = strcmp(currentNode -> list -> head -> ingredient, currentIngredient -> ingredientName);
         if(cmp == 0) {
             Batch* currentBatch = currentNode -> list -> head;
-            int quantityBatchLeft = 0;
             //se per preparare 1 torta mi servono 2 uova. per prepararne X mi servono 2*X uova
             int quantityToFind = currentIngredient -> quantity * quantityOrder;
             while(!ingredientFound && currentBatch != NULL) {
-                quantityBatchLeft = currentBatch -> quantity - quantityToFind;
-                quantityToFind = quantityToFind - currentBatch -> quantity;
-                if(quantityToFind <= 0)
-                    ingredientFound = true;
 
-                currentBatch = currentBatch -> next;
+                //se nella chiamata del metodo precedente ho tolto (virtualmente)
+                if(wareHouseListofLists -> modified == true && currentBatch -> quantityLeft < currentBatch -> quantity) {
+                    if(currentBatch -> quantityLeft <= 0) {
+                        Batch* temp = NULL;
+                        //cancello nodo
+                        if(last == NULL) {
+                            temp = currentBatch;
+                            currentNode -> list -> head = currentBatch -> next;
+                            free(temp);
+                        }else {
+                            temp = currentBatch;
+                            last -> next = currentBatch -> next;
+                            currentBatch = currentBatch -> next;
+                            free(temp);
+                        }
+                    }else {
+                        //modifico quantity poichè la quantità è diminuita ma non è finita
+                        currentBatch -> quantity = currentBatch -> quantityLeft;
+                    }
+                }else {
+                    //se avevo modificato quantityLeft ma poi non ho realmente tolto gli ingredienti dal magazzino rispristino il valore iniziale
+                    currentBatch -> quantityLeft = currentBatch -> quantity;
+                    if(currentBatch -> expiration > currentTime) {
+                        currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
+                        quantityToFind = quantityToFind - currentBatch -> quantity;
+                        if(quantityToFind <= 0)
+                            ingredientFound = true;
+                    }else {
+                        //cancello nodo scaduto
+                        currentBatch -> quantityLeft = 0;
+                    }
+                    last = currentBatch;
+                    currentBatch = currentBatch -> next;
+                }
             }
 
             if(ingredientFound){
@@ -440,34 +531,7 @@ bool checkIfIngredientIsPresentInWareHouse(ListOfList* wareHouseListofLists, Ord
                 order -> weight = 0;
                 return false;
             }
-            /*
-            if(ingredientFound){
-                ingredientFound = false;
-                Batch* headBatchList = currentNode -> list -> head;
-                Batch* temp = NULL;
-                //ciclo fino alla fine dei lotti o fino a che i lotti sono scaduti
-                while (headBatchList != NULL && headBatchList -> expiration > currentTime) {
-                    if(headBatchList == currentBatch)
-                        break;
-                    temp = headBatchList;
-                    headBatchList = temp -> next;
-                    free(temp);
-                }
-                if(quantityBatchLeft == 0) {
-                    //ultimo lotto svuotato. lo elimino
-                    temp = currentBatch;
-                    currentBatch = currentBatch -> next;
-                    currentNode -> list -> head = currentBatch;
-                    free(temp);
-                }else {
-                    //ultimo lotto va diminuita solo la quantitò
-                    currentBatch -> quantity = quantityBatchLeft;
-                    currentNode -> list -> head = currentBatch;
-                }
 
-            }else
-                return 1;
-            */
         }else if(cmp > 0){
             //non è presente alcun lotto del ingrediente cercato
             order -> weight = 0;
@@ -477,6 +541,7 @@ bool checkIfIngredientIsPresentInWareHouse(ListOfList* wareHouseListofLists, Ord
     }
     //tutti gli ingredienti trovati
     //prima di restituire true devo cancellare tutti i batch che utilizzo per preparare l'ordine
+    wareHouseListofLists -> modified = true;
     return true;
 }
 
@@ -494,18 +559,20 @@ bool checkIfRecipeIsPresentInReadyQueue(Queue* readyQueue, char* recipeName) {
     return false;
 }
 
-void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists) {
+void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, int currentTime) {
 
     //scorro tutta la queue e verifico se ogni ordine è preparabile o no
     //se un ordine è preparabile rimuovo gli ingredienti dai batch e sposto l'ordine nella coda degli ordini pronti
     Order* currentOrder = waitQueue -> head;
     Order* last = NULL;
+    bool modifiedNow = false;
 
     while (currentOrder != NULL) {
 
         //itero sugli ingredienti e controllo con checkIfIngredientIsPresentInWarehouse se sono tutti presenti
         //se sono tutti presenti sposto l'ordine in readyQueue e rimuovo gli ingredienti dal magazzino
-        if(checkIfIngredientIsPresentInWareHouse(listOfLists, currentOrder)) {
+        if(checkIfIngredientIsPresentInWareHouse(listOfLists, currentOrder, currentTime)) {
+            modifiedNow = true;
             //sistemo lista waitQueue
             if(last == NULL){
                 waitQueue -> head = currentOrder -> next;
@@ -522,6 +589,27 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists) 
         last = currentOrder;
         currentOrder = currentOrder -> next;
     }
+    //se almeno un ordine viene processato pongo il magazzino a modificato altrimenti a false
+    if(modifiedNow == true) {
+        listOfLists -> modified = true;
+    }else {
+        listOfLists -> modified = false;
+    }
+}
+
+bool prepareSingleOrder(ListOfList* listofLists, Order* order, int currentTime) {
+
+    bool modifiedNow = false;
+    if(checkIfIngredientIsPresentInWareHouse(listofLists, order, currentTime)) {
+        modifiedNow = true;
+    }
+    //se almeno un ordine viene processato pongo il magazzino a modificato altrimenti a false
+    if(modifiedNow == true) {
+        listofLists -> modified = true;
+    }else {
+        listofLists -> modified = false;
+    }
+    return modifiedNow;
 }
 
 void removeNewline(char *str) {
@@ -648,7 +736,7 @@ void UTILS_commandsHandler() {
         if(currentTime != 0 && currentTime % periodicity == 0) {
             //arriva il furgone
             //controllo se gli ordini in attesa possono essere preparati
-            prepareOrder(waitQueue, readyQueue, listOfLists);
+            prepareOrder(waitQueue, readyQueue, listOfLists, currentTime);
             //lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
             fillVan(capacity, readyQueue);
         }
@@ -715,7 +803,7 @@ void UTILS_commandsHandler() {
                 order -> ingredientList = recipe -> ingredientList;
                 //invio ordine (poi si deve verificare se l'ordine può essere elaborato o no in base alle scorte, lotti in magazzino)
                 //controllo subito se l'ordine può essere preparato. in tal caso lo metto direttamente in readyQueue
-                if(checkIfIngredientIsPresentInWareHouse(listOfLists, order)) {
+                if(prepareSingleOrder(listOfLists, order, currentTime)) {
                     //posso preparare subito l'ordine quindi lo metto in readyQueue
                     //printf("-----------preparo ordine %s-----------\n", order ->recipeName);
                     appendOrderInReadyQueue(order, readyQueue);
@@ -756,3 +844,32 @@ int main(void) {
 
     return 0;
 }
+
+/*
+         if(ingredientFound){
+             ingredientFound = false;
+             Batch* headBatchList = currentNode -> list -> head;
+             Batch* temp = NULL;
+             //ciclo fino alla fine dei lotti o fino a che i lotti sono scaduti
+             while (headBatchList != NULL && headBatchList -> expiration > currentTime) {
+                 if(headBatchList == currentBatch)
+                     break;
+                 temp = headBatchList;
+                 headBatchList = temp -> next;
+                 free(temp);
+             }
+             if(quantityBatchLeft == 0) {
+                 //ultimo lotto svuotato. lo elimino
+                 temp = currentBatch;
+                 currentBatch = currentBatch -> next;
+                 currentNode -> list -> head = currentBatch;
+                 free(temp);
+             }else {
+                 //ultimo lotto va diminuita solo la quantitò
+                 currentBatch -> quantity = quantityBatchLeft;
+                 currentNode -> list -> head = currentBatch;
+             }
+
+         }else
+             return 1;
+         */
