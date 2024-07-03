@@ -8,7 +8,7 @@
 
 #define MAX_COMMAND_ARGUMENT_LENGTH 255
 
-#define COMMAND_BUFFER_SIZE MAX_COMMAND_ARGUMENTS * MAX_COMMAND_ARGUMENT_LENGTH
+#define COMMAND_BUFFER_SIZE (MAX_COMMAND_ARGUMENTS * MAX_COMMAND_ARGUMENT_LENGTH)
 // The delimiter between arguments is a space.
 #define COMMAND_ARGUMENTS_DELIMITER " "
 
@@ -573,6 +573,7 @@ bool checkIfIngredientIsPresentInNotModifiedWareHouse(ListOfList* wareHouseListo
     while (currentNode != NULL && currentIngredient != NULL) {
         int cmp = strcmp(currentNode -> list -> head -> ingredient, currentIngredient -> ingredientName);
         if(cmp == 0) {
+            lastBatch = NULL;
             Batch* currentBatch = currentNode -> list -> head;
             //se per preparare 1 torta mi servono 2 uova. per prepararne X mi servono 2*X uova
             int quantityToFind = currentIngredient -> quantity * quantityOrder;
@@ -835,8 +836,10 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
         }else {
             //se invece non sono tutti presenti non faccio nulla a currentOrder (per farlo conviene creare una nuova coda temporanea se no continuo a iterare all'infinito)
             //appendOrderInWaitQueue(currentOrder, waitQueue);
+
             last = currentOrder;
             currentOrder = currentOrder -> next;
+
         }
     }
     //se almeno un ordine viene processato pongo il magazzino a modificato altrimenti a false
@@ -956,8 +959,7 @@ void selectOrderToPutInVan(int capacity, Queue* readyQueue) {
 
         }else {
             //l'ordine non ci sta sul van, passo a quello successivo
-            last = currentOrder;
-            currentOrder = currentOrder -> next;
+            vanCapacity = 0;
         }
     }
     if(readyQueue -> head == NULL)
@@ -1017,11 +1019,6 @@ void UTILS_commandsHandler() {
     }
 
     while (fgets(commandBuffer, COMMAND_BUFFER_SIZE, stdin)) {
-        if(currentTime != 0 && currentTime % periodicity == 0) {
-            //arriva il furgone
-            //lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
-            selectOrderToPutInVan(capacity, readyQueue);
-        }
         commandArgumentHolder = strtok(commandBuffer, COMMAND_ARGUMENTS_DELIMITER);
         tmp = UTILS_hashString(commandArgumentHolder);
         switch (tmp) {
@@ -1103,6 +1100,11 @@ void UTILS_commandsHandler() {
         default:
             return;
             break;
+        }
+        if(currentTime != 0 && currentTime % periodicity == 0) {
+            //arriva il furgone
+            //lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
+            selectOrderToPutInVan(capacity, readyQueue);
         }
         currentTime++;
     }
