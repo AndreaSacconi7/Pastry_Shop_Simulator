@@ -427,8 +427,8 @@ void appendOrderInReadyQueue(Order* newOrder, Queue* readyQueue) {
     while (currentOrder != NULL) {
         if(currentOrder -> weight < weight) {
             if(last == NULL) {
+                newOrder -> next = readyQueue -> head;
                 readyQueue -> head = newOrder;
-                newOrder -> next = currentOrder;
             }else {
                 last -> next = newOrder;
                 newOrder -> next = currentOrder;
@@ -439,13 +439,14 @@ void appendOrderInReadyQueue(Order* newOrder, Queue* readyQueue) {
             currentOrder = currentOrder -> next;
         }
     }
-
+    //inserimento in coda
     if(last == NULL) {
-        //inserimento in testa che non si dovrebbe verificare perchè coperto da if all'inizio
-        readyQueue -> head = newOrder;
-        newOrder -> next = currentOrder;
-        readyQueue -> head = newOrder;
+        //inserimento in coda con un solo nodo presente nella queue (in teoria non succede perchè last è sempre diverso da NULL)
+        readyQueue -> head -> next = newOrder;
+        readyQueue -> tail = newOrder;
+        newOrder -> next = NULL;
     }else {
+        //inserimento in coda con più nodi presenti nella queue
         last -> next = newOrder;
         newOrder -> next = NULL;
         readyQueue -> tail = newOrder;
@@ -803,6 +804,7 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
     //se un ordine è preparabile rimuovo gli ingredienti dai batch e sposto l'ordine nella coda degli ordini pronti
     Order* currentOrder = waitQueue -> head;
     Order* last = NULL;
+    Order* next = NULL;
     //bool modifiedNow = false;
 
     while (currentOrder != NULL) {
@@ -819,10 +821,10 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
                 last -> next = currentOrder -> next;
             }
             //devo far prima lo spostamento in avanti se no perdo il riferimento all'ordine next in wait
-            last = currentOrder;
-            currentOrder = currentOrder -> next;
+            next = currentOrder -> next;
             //sposto last che sarebbe l'ordino pronto da wait a ready
-            appendOrderInReadyQueue(last, readyQueue);
+            appendOrderInReadyQueue(currentOrder, readyQueue);
+            currentOrder = next;
         }else {
             //se invece non sono tutti presenti non faccio nulla a currentOrder (per farlo conviene creare una nuova coda temporanea se no continuo a iterare all'infinito)
             //appendOrderInWaitQueue(currentOrder, waitQueue);
@@ -909,6 +911,7 @@ void fillVan(int capacity, Queue* readyQueue) {
     int vanCapacity = capacity;
     Order* currentOrder = readyQueue -> head;
     Order* temp = NULL;
+    Order* last = NULL;
     while (currentOrder != NULL && vanCapacity > 0) {
 
         if(vanCapacity > currentOrder -> weight) {
@@ -916,14 +919,30 @@ void fillVan(int capacity, Queue* readyQueue) {
             vanCapacity = vanCapacity - currentOrder -> weight;
             printf("%d %s %d\n", currentOrder -> time, currentOrder -> recipeName, currentOrder -> quantity);
             temp = currentOrder;
+            if(last != NULL)
+                last -> next = currentOrder -> next;
+            else
+                readyQueue -> head = currentOrder -> next;
+
             currentOrder = currentOrder -> next;
             free(temp);
         }else {
             //l'ordine non ci sta sul van, passo a quello successivo
+            last = currentOrder;
             currentOrder = currentOrder -> next;
         }
     }
-    readyQueue -> head = currentOrder;
+    if(readyQueue -> head == NULL)
+        readyQueue -> tail = NULL;
+    /*
+    if(currentOrder != NULL) {
+        readyQueue -> head = currentOrder;
+    }else {
+        //ready queue svuotata
+        readyQueue -> head = NULL;
+        readyQueue -> tail = NULL;
+    }
+    */
 }
 
 //
