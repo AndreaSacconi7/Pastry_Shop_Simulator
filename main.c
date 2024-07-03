@@ -307,8 +307,10 @@ ListOfList* createListOfLists() {
 //scadenza più vicina -> scadenza più lontana
 void appendToInternalList(InternalList* list, Batch* newNode) {
 
-    if (list->head == NULL) {
-        list->head = newNode;
+    if (list -> head == NULL) {
+        list -> head = newNode;
+        newNode -> next = NULL;
+        return;
     }
 
     Batch* currentBatch = list -> head;
@@ -331,11 +333,12 @@ void appendToInternalList(InternalList* list, Batch* newNode) {
     }
     //inserimento in coda dopo aver scorso tutta la lista
     if(last == NULL) {
-        newNode -> next = list -> head;
-        list -> head = newNode;
+        //inserimento in coda con un solo elemento (non dovrebbe succedere)
+        list -> head -> next = newNode;
+        newNode -> next = NULL;
     }else {
         last -> next = newNode;
-        newNode -> next = currentBatch;
+        newNode -> next = NULL;
     }
 }
 
@@ -398,20 +401,23 @@ void insertBatchInWareHouse(ListOfList* listOfLists, Batch* newBatch) {
     appendToListOfLists(last, newInternalList, listOfLists);
 }
 
-void appendOrderInWaitQueue(Order* newOrder, Queue* waitQueue) {
+void appendOrderInQueue(Order* newOrder, Queue* waitQueue) {
 
     if(waitQueue -> head == NULL) {
         waitQueue -> tail = newOrder;
         waitQueue -> head = waitQueue -> tail;
+        newOrder -> next = NULL;
         return;
     }
 
     Order* lastTail = waitQueue -> tail;
     lastTail -> next = newOrder;
     waitQueue -> tail = newOrder;
+    newOrder -> next = NULL;
 }
 
-void appendOrderInReadyQueue(Order* newOrder, Queue* readyQueue) {
+
+void appendOrderInVanQueue(Order* newOrder, Queue* readyQueue) {
 
     if(readyQueue -> head == NULL) {
         readyQueue -> tail = newOrder;
@@ -452,6 +458,7 @@ void appendOrderInReadyQueue(Order* newOrder, Queue* readyQueue) {
         readyQueue -> tail = newOrder;
     }
 }
+
 
 void removeOrderInQueue(Queue* queue) {
 
@@ -823,7 +830,7 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
             //devo far prima lo spostamento in avanti se no perdo il riferimento all'ordine next in wait
             next = currentOrder -> next;
             //sposto last che sarebbe l'ordino pronto da wait a ready
-            appendOrderInReadyQueue(currentOrder, readyQueue);
+            appendOrderInQueue(currentOrder, readyQueue);
             currentOrder = next;
         }else {
             //se invece non sono tutti presenti non faccio nulla a currentOrder (per farlo conviene creare una nuova coda temporanea se no continuo a iterare all'infinito)
@@ -854,7 +861,7 @@ void removeNewline(char *str) {
     }
 }
 
-void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* readyQueue) {
+void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* readyQueue, Queue* waitQueue) {
 
     if(recipeList -> head == NULL) {
         printf("non presente\n");
@@ -876,7 +883,7 @@ void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* ready
             //ricetta già presente nella lista
             //controllo se ci sono ordini in sospeso relativi a questa ricetta.
             //se si stampo in sospeso e non faccio nulla altrimenti rimossa e la rimuovo
-            if(!checkIfRecipeIsPresentInReadyQueue(readyQueue, recipeName)) {
+            if(!checkIfRecipeIsPresentInReadyQueue(readyQueue, recipeName) && !checkIfRecipeIsPresentInReadyQueue(waitQueue, recipeName)) {
                 //la ricetta non è presente in waitQueue quindi posso rimuoverla
                 printf("rimossa\n");
                 //aggiusto la lista e poi cancello la ricetta
@@ -901,31 +908,52 @@ void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* ready
     printf("non presente\n");
 }
 
-void fillVan(int capacity, Queue* readyQueue) {
+void fillVan(Queue* vanQueue) {
+
+    Order* currentOrder = vanQueue -> head;
+    Order* temp = NULL;
+    while (currentOrder != NULL) {
+        printf("%d %s %d\n", currentOrder -> time, currentOrder -> recipeName, currentOrder -> quantity);
+        temp = currentOrder;
+        currentOrder = currentOrder -> next;
+        free(temp);
+    }
+}
+
+void selectOrderToPutInVan(int capacity, Queue* readyQueue) {
 
     //non ci sono ordini pronti
     if(readyQueue -> head == NULL) {
         printf("camioncino vuoto\n");
         return;
     }
+
+    Queue* vanQueue = createQueue();
+
     int vanCapacity = capacity;
     Order* currentOrder = readyQueue -> head;
     Order* temp = NULL;
     Order* last = NULL;
+    Order* next = NULL;
+
     while (currentOrder != NULL && vanCapacity > 0) {
 
-        if(vanCapacity > currentOrder -> weight) {
+        if(vanCapacity >= currentOrder -> weight) {
+
             //l'ordine viene caricato sul van
             vanCapacity = vanCapacity - currentOrder -> weight;
-            printf("%d %s %d\n", currentOrder -> time, currentOrder -> recipeName, currentOrder -> quantity);
-            temp = currentOrder;
-            if(last != NULL)
-                last -> next = currentOrder -> next;
-            else
-                readyQueue -> head = currentOrder -> next;
 
-            currentOrder = currentOrder -> next;
-            free(temp);
+            if(last == NULL){
+                readyQueue -> head = currentOrder -> next;
+            }else {
+                last -> next = currentOrder -> next;
+            }
+            //devo far prima lo spostamento in avanti se no perdo il riferimento all'ordine next in wait
+            next = currentOrder -> next;
+            //sposto last che sarebbe l'ordino pronto da wait a ready
+            appendOrderInVanQueue(currentOrder, vanQueue);
+            currentOrder = next;
+
         }else {
             //l'ordine non ci sta sul van, passo a quello successivo
             last = currentOrder;
@@ -934,6 +962,10 @@ void fillVan(int capacity, Queue* readyQueue) {
     }
     if(readyQueue -> head == NULL)
         readyQueue -> tail = NULL;
+
+    fillVan(vanQueue);
+
+    free(vanQueue);
     /*
     if(currentOrder != NULL) {
         readyQueue -> head = currentOrder;
@@ -988,7 +1020,7 @@ void UTILS_commandsHandler() {
         if(currentTime != 0 && currentTime % periodicity == 0) {
             //arriva il furgone
             //lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
-            fillVan(capacity, readyQueue);
+            selectOrderToPutInVan(capacity, readyQueue);
         }
         commandArgumentHolder = strtok(commandBuffer, COMMAND_ARGUMENTS_DELIMITER);
         tmp = UTILS_hashString(commandArgumentHolder);
@@ -1023,7 +1055,7 @@ void UTILS_commandsHandler() {
             commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
             recipeName = strdup(commandArgumentHolder);
             //rimuovo ricetta da hash table
-            removeRecipeFromList(recipeName, recipeList, readyQueue);
+            removeRecipeFromList(recipeName, recipeList, readyQueue, waitQueue);
             break;
         case rifornimento_HASH:
             while ((commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER)) != NULL) {
@@ -1058,11 +1090,11 @@ void UTILS_commandsHandler() {
                 if(prepareSingleOrder(listOfLists, order, currentTime)) {
                     //posso preparare subito l'ordine quindi lo metto in readyQueue
                     //printf("-----------preparo ordine %s-----------\n", order ->recipeName);
-                    appendOrderInReadyQueue(order, readyQueue);
+                    appendOrderInQueue(order, readyQueue);
                 }else {
                     //printf("-----------metto in attesa %s----------\n", order -> recipeName);
                     //altrimenti lo metto in waitQueue
-                    appendOrderInWaitQueue(order, waitQueue);
+                    appendOrderInQueue(order, waitQueue);
                 }
             }else {
                 printf("rifiutato\n");
@@ -1077,7 +1109,7 @@ void UTILS_commandsHandler() {
     //ultima volta che arriva il van, dopo l'ultimo comando
     if(currentTime % periodicity == 0) {
         //arriva il furgone. lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
-        fillVan(capacity, readyQueue);
+        selectOrderToPutInVan(capacity, readyQueue);
     }
 }
 
