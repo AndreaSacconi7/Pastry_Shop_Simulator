@@ -97,7 +97,7 @@ typedef struct Queue {
 
 Node* createNodeIngredient(char* nameIngredient, int quantity) {
     Node* newNode = (Node*)malloc(sizeof(Node));
-    if (!newNode) {
+    if (newNode == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -110,7 +110,7 @@ Node* createNodeIngredient(char* nameIngredient, int quantity) {
 Recipe* createRecipe(char* nameRecipe) {
     Recipe* newRecipe = (Recipe*)malloc(sizeof(Recipe));
     List* ingredientList = (List*)malloc(sizeof(List));
-    if (!newRecipe || !ingredientList) {
+    if (newRecipe == NULL || ingredientList == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -123,7 +123,7 @@ Recipe* createRecipe(char* nameRecipe) {
 
 RecipeList* createRecipeList() {
     RecipeList* newRecipeList = (RecipeList*)malloc(sizeof(RecipeList));
-    if(!newRecipeList) {
+    if(newRecipeList == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -135,7 +135,7 @@ RecipeList* createRecipeList() {
 Order* createOrder(char* recipeName, int quantity, int currentTime) {
 
     Order* newOrder = (Order*)malloc(sizeof(Order));
-    if(!newOrder) {
+    if(newOrder == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -151,7 +151,7 @@ Order* createOrder(char* recipeName, int quantity, int currentTime) {
 Queue* createQueue() {
 
     Queue* newQueue = (Queue*)malloc(sizeof(Queue));
-    if(!newQueue) {
+    if(newQueue == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -162,7 +162,7 @@ Queue* createQueue() {
 
 UsedBatch* createUsedBatch(Batch* batch) {
     UsedBatch* newUsedBatch = (UsedBatch*)malloc(sizeof(UsedBatch));
-    if(!newUsedBatch) {
+    if(newUsedBatch == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -174,7 +174,7 @@ UsedBatch* createUsedBatch(Batch* batch) {
 
 UsedBatchList* createUsedBatchList() {
     UsedBatchList* usedBatchList = (UsedBatchList*)malloc(sizeof(UsedBatchList));
-    if(!usedBatchList) {
+    if(usedBatchList == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -226,8 +226,15 @@ void appendIngredientToList(Node* newNode, List* list){
         }
     }
     //arrivo qui solo se il nuovo ingrediente va inserito in coda
-    last -> next = newNode;
-    newNode -> next = NULL;
+    if(last != NULL) {
+        //inserimento in coda con X elementi in lista
+        last -> next = newNode;
+        newNode -> next = NULL;
+    }else {
+        //inserimento in coda con solo un elemento in lista
+        list -> head -> next = newNode;
+        newNode -> next = NULL;
+    }
 }
 
 void appendRecipeToList(Recipe* newRecipe, RecipeList* list) {
@@ -264,12 +271,18 @@ void appendRecipeToList(Recipe* newRecipe, RecipeList* list) {
             return;
         }
     }
+    //inserimento in coda
+    if(last != NULL) {
+        //inserimento in coda con X elementi in lista
+        last -> next = newRecipe;
+        newRecipe -> next = NULL;
+    }
 }
 
 Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
 
     Batch* newBatch = (Batch*)malloc(sizeof(Batch));
-    if(!newBatch) {
+    if(newBatch == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -284,7 +297,7 @@ Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
 
 InternalList* createInternalList() {
     InternalList* newList = (InternalList*)malloc(sizeof(InternalList));
-    if (!newList) {
+    if (newList == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -294,7 +307,7 @@ InternalList* createInternalList() {
 
 ListOfList* createListOfLists() {
     ListOfList* newListOfLists = (ListOfList*)malloc(sizeof(ListOfList));
-    if (!newListOfLists) {
+    if (newListOfLists == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -344,7 +357,7 @@ void appendToInternalList(InternalList* list, Batch* newNode) {
 
 void appendToListOfLists(ListNode* lastNode, InternalList* newInternalList, ListOfList* listOfLists) {
     ListNode* newListNode = (ListNode*)malloc(sizeof(ListNode));
-    if (!newListNode) {
+    if (newListNode == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
@@ -410,14 +423,12 @@ void appendOrderInQueue(Order* newOrder, Queue* waitQueue) {
         return;
     }
 
-    Order* lastTail = waitQueue -> tail;
-    lastTail -> next = newOrder;
+    waitQueue -> tail -> next = newOrder;
     waitQueue -> tail = newOrder;
     newOrder -> next = NULL;
 }
 
-
-void appendOrderInVanQueue(Order* newOrder, Queue* readyQueue) {
+void appendOrderInReadyQueue(Order* newOrder, Queue* readyQueue) {
 
     if(readyQueue -> head == NULL) {
         readyQueue -> tail = newOrder;
@@ -428,10 +439,10 @@ void appendOrderInVanQueue(Order* newOrder, Queue* readyQueue) {
 
     Order* currentOrder = readyQueue -> head;
     Order* last = NULL;
-    int weight = newOrder -> weight;
+    int orderTime = newOrder -> time;
 
     while (currentOrder != NULL) {
-        if(currentOrder -> weight < weight) {
+        if(currentOrder -> time > orderTime) {
             if(last == NULL) {
                 newOrder -> next = readyQueue -> head;
                 readyQueue -> head = newOrder;
@@ -456,6 +467,49 @@ void appendOrderInVanQueue(Order* newOrder, Queue* readyQueue) {
         last -> next = newOrder;
         newOrder -> next = NULL;
         readyQueue -> tail = newOrder;
+    }
+}
+
+
+void appendOrderInVanQueue(Order* newOrder, Queue* vanQueue) {
+
+    if(vanQueue -> head == NULL) {
+        vanQueue -> tail = newOrder;
+        vanQueue -> head = newOrder;
+        newOrder -> next = NULL;
+        return;
+    }
+
+    Order* currentOrder = vanQueue -> head;
+    Order* last = NULL;
+    int weight = newOrder -> weight;
+
+    while (currentOrder != NULL) {
+        if(currentOrder -> weight < weight) {
+            if(last == NULL) {
+                newOrder -> next = vanQueue -> head;
+                vanQueue -> head = newOrder;
+            }else {
+                last -> next = newOrder;
+                newOrder -> next = currentOrder;
+            }
+            return;
+        }else {
+            last = currentOrder;
+            currentOrder = currentOrder -> next;
+        }
+    }
+    //inserimento in coda
+    if(last == NULL) {
+        //inserimento in coda con un solo nodo presente nella queue (in teoria non succede perchè last è sempre diverso da NULL)
+        vanQueue -> head -> next = newOrder;
+        vanQueue -> tail = newOrder;
+        newOrder -> next = NULL;
+    }else {
+        //inserimento in coda con più nodi presenti nella queue
+        last -> next = newOrder;
+        newOrder -> next = NULL;
+        vanQueue -> tail = newOrder;
     }
 }
 
@@ -547,7 +601,7 @@ int fixBatchWareHouse(Batch* currentBatch, Batch* lastBatch, ListNode* currentNo
                     return 6;
                 }
             }else {
-                temp = currentBatch;
+                //temp = currentBatch;
                 lastBatch -> next = currentBatch -> next;
                 //currentBatch = currentBatch -> next;
                 return 4;
@@ -640,7 +694,8 @@ bool checkIfIngredientIsPresentInNotModifiedWareHouse(ListOfList* wareHouseListo
             return false;
         }
         lastNode = currentNode;
-        currentNode = currentNode -> next;
+        if(currentNode != NULL)
+            currentNode = currentNode -> next;
     }
     //tutti gli ingredienti trovati
     //prima di restituire true devo cancellare tutti i batch che utilizzo per preparare l'ordine
@@ -824,14 +879,13 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
             //sistemo lista waitQueue
             if(last == NULL){
                 waitQueue -> head = currentOrder -> next;
-                waitQueue -> tail = currentOrder -> next;
             }else {
                 last -> next = currentOrder -> next;
             }
             //devo far prima lo spostamento in avanti se no perdo il riferimento all'ordine next in wait
             next = currentOrder -> next;
             //sposto last che sarebbe l'ordino pronto da wait a ready
-            appendOrderInQueue(currentOrder, readyQueue);
+            appendOrderInReadyQueue(currentOrder, readyQueue);
             currentOrder = next;
         }else {
             //se invece non sono tutti presenti non faccio nulla a currentOrder (per farlo conviene creare una nuova coda temporanea se no continuo a iterare all'infinito)
@@ -842,6 +896,10 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
 
         }
     }
+    if(last != NULL)
+        waitQueue -> tail = last;
+    else
+        waitQueue -> tail = NULL;
     //se almeno un ordine viene processato pongo il magazzino a modificato altrimenti a false
     /*
     if(modifiedNow == true) {
@@ -935,8 +993,7 @@ void selectOrderToPutInVan(int capacity, Queue* readyQueue) {
 
     int vanCapacity = capacity;
     Order* currentOrder = readyQueue -> head;
-    Order* temp = NULL;
-    Order* last = NULL;
+    //Order* last = NULL;
     Order* next = NULL;
 
     while (currentOrder != NULL && vanCapacity > 0) {
@@ -946,11 +1003,8 @@ void selectOrderToPutInVan(int capacity, Queue* readyQueue) {
             //l'ordine viene caricato sul van
             vanCapacity = vanCapacity - currentOrder -> weight;
 
-            if(last == NULL){
-                readyQueue -> head = currentOrder -> next;
-            }else {
-                last -> next = currentOrder -> next;
-            }
+            readyQueue -> head = currentOrder -> next;
+
             //devo far prima lo spostamento in avanti se no perdo il riferimento all'ordine next in wait
             next = currentOrder -> next;
             //sposto last che sarebbe l'ordino pronto da wait a ready
@@ -1019,6 +1073,11 @@ void UTILS_commandsHandler() {
     }
 
     while (fgets(commandBuffer, COMMAND_BUFFER_SIZE, stdin)) {
+        if(currentTime != 0 && currentTime % periodicity == 0) {
+            //arriva il furgone
+            //lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
+            selectOrderToPutInVan(capacity, readyQueue);
+        }
         commandArgumentHolder = strtok(commandBuffer, COMMAND_ARGUMENTS_DELIMITER);
         tmp = UTILS_hashString(commandArgumentHolder);
         switch (tmp) {
@@ -1087,7 +1146,7 @@ void UTILS_commandsHandler() {
                 if(prepareSingleOrder(listOfLists, order, currentTime)) {
                     //posso preparare subito l'ordine quindi lo metto in readyQueue
                     //printf("-----------preparo ordine %s-----------\n", order ->recipeName);
-                    appendOrderInQueue(order, readyQueue);
+                    appendOrderInReadyQueue(order, readyQueue);
                 }else {
                     //printf("-----------metto in attesa %s----------\n", order -> recipeName);
                     //altrimenti lo metto in waitQueue
@@ -1099,12 +1158,7 @@ void UTILS_commandsHandler() {
             break;
         default:
             return;
-            break;
-        }
-        if(currentTime != 0 && currentTime % periodicity == 0) {
-            //arriva il furgone
-            //lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
-            selectOrderToPutInVan(capacity, readyQueue);
+            //break;
         }
         currentTime++;
     }
