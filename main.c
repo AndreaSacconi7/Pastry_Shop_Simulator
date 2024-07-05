@@ -316,9 +316,23 @@ ListOfList* createListOfLists() {
     return newListOfLists;
 }
 
+void fixSuccesorBatch(Batch* currentBatch, bool modified) {
+
+    while(currentBatch != NULL) {
+
+        if(currentBatch -> quantityLeft < currentBatch -> quantity) {
+            if(modified)
+                currentBatch -> quantity = currentBatch -> quantityLeft;
+            else
+                currentBatch -> quantityLeft = currentBatch -> quantity;
+        }
+        currentBatch = currentBatch -> next;
+    }
+}
+
 //la internal list viene ordinata in ordine di expiration
 //scadenza più vicina -> scadenza più lontana
-void appendToInternalList(InternalList* list, Batch* newNode) {
+void appendToInternalList(InternalList* list, Batch* newNode, bool modified) {
 
     if (list -> head == NULL) {
         list -> head = newNode;
@@ -330,6 +344,7 @@ void appendToInternalList(InternalList* list, Batch* newNode) {
     Batch* last = NULL;
 
     while(currentBatch != NULL) {
+
         if(currentBatch -> expiration <= newNode -> expiration) {
             last = currentBatch;
             currentBatch = currentBatch -> next;
@@ -341,6 +356,8 @@ void appendToInternalList(InternalList* list, Batch* newNode) {
                 last -> next = newNode;
                 newNode -> next = currentBatch;
             }
+            //aggiusto i successivi batch compreso il currentBatch poichè viene posto dopo newNode
+            fixSuccesorBatch(currentBatch, modified);
             return;
         }
     }
@@ -384,7 +401,7 @@ void insertBatchInWareHouse(ListOfList* listOfLists, Batch* newBatch) {
 
     if(listOfLists -> head == NULL) {
         InternalList* newInternalList = createInternalList();
-        appendToInternalList(newInternalList, newBatch);
+        appendToInternalList(newInternalList, newBatch, listOfLists -> modified);
         appendToListOfLists(last, newInternalList, listOfLists);
         return;
     }
@@ -397,20 +414,20 @@ void insertBatchInWareHouse(ListOfList* listOfLists, Batch* newBatch) {
 
         }else if(cmp == 0){
             //aggiungo in lista interna
-            appendToInternalList(temp -> list, newBatch);
+            appendToInternalList(temp -> list, newBatch, listOfLists -> modified);
             return;
 
         }else {
             //superato ordine alfabetico di newBatch
             InternalList* newInternalList = createInternalList();
-            appendToInternalList(newInternalList, newBatch);
+            appendToInternalList(newInternalList, newBatch, listOfLists -> modified);
             appendToListOfLists(last, newInternalList, listOfLists);
             return;
         }
     }
     //creo lista interna dopo il nodo last
     InternalList* newInternalList = createInternalList();
-    appendToInternalList(newInternalList, newBatch);
+    appendToInternalList(newInternalList, newBatch, listOfLists -> modified);
     appendToListOfLists(last, newInternalList, listOfLists);
 }
 
@@ -871,7 +888,6 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
     //bool modifiedNow = false;
 
     while (currentOrder != NULL) {
-
         //itero sugli ingredienti e controllo con checkIfIngredientIsPresentInWarehouse se sono tutti presenti
         //se sono tutti presenti sposto l'ordine in readyQueue e rimuovo gli ingredienti dal magazzino
         if(checkIfIngredientIsPresentInWareHouse(listOfLists, currentOrder, currentTime)) {
