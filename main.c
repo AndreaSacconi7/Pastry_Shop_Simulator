@@ -17,7 +17,8 @@
 #define rifornimento_HASH 1308
 #define ordine_HASH 641
 
-
+#define INITIAL_TABLE_SIZE 50
+#define LOAD_FACTOR_THRESHOLD 0.7
 
 //ingrediente
 typedef struct Node {
@@ -51,32 +52,20 @@ typedef struct Batch {
     struct Batch* next;
 } Batch;
 
-typedef struct UsedBatch {
-    Batch* batch;
-    struct UsedBatch* next;
-    struct UsedBatch* previous;
-} UsedBatch;
-
-typedef struct UsedBatchList {
-    UsedBatch* head;
-} UsedBatchList;
-
-// Struttura per la lista interna con puntatori a head e tail
-typedef struct InternalList {
-    Batch* head;
-} InternalList;
-
 // Struttura per il nodo della lista esterna
-typedef struct ListNode {
-    InternalList* list;
-    struct ListNode* next;
-} ListNode;
+typedef struct Item {
+    char* ingredientKey;
+    Batch* list;
+    bool isDeleted;
+    struct Item* next;
+} Item;
 
 //lista di lotti (magazzino)
-typedef struct ListOfList {
-    ListNode* head;            //lotto con scadenza più vicina (dove estraggo)
-    bool modified;
-} ListOfList;
+typedef struct HashTable {
+    Item** items;            //lotto con scadenza più vicina (dove estraggo)
+    int size;                   //dimensione della tabella hash
+    int count;                  //numero di ingredienti presenti
+} HashTable;
 
 typedef struct Order {
     int quantity;
@@ -94,6 +83,45 @@ typedef struct Queue {
     Order* head;
     Order* tail;
 } Queue;
+
+//
+//prototipi funzioni
+//
+void resize(HashTable* table);
+
+
+//
+//funzioni hash
+//
+
+unsigned int hashFunction(char* key, int tableSize) {
+    unsigned long int value = 0;
+    unsigned int i = 0;
+    unsigned int key_len = strlen(key);
+
+    for (; i < key_len; ++i) {
+        value = value * 37 + key[i];
+    }
+
+    return value % tableSize;
+}
+
+unsigned int hashFunction2(char* key, int tableSize) {
+    unsigned long int value = 0;
+    unsigned int i = 0;
+    unsigned int key_len = strlen(key);
+
+    for (; i < key_len; ++i) {
+        value = value * 31 + key[i];
+    }
+
+    return (value % (tableSize - 1)) + 1;
+}
+
+
+//
+//funzioni create
+//
 
 Node* createNodeIngredient(char* nameIngredient, int quantity) {
     Node* newNode = (Node*)malloc(sizeof(Node));
@@ -160,37 +188,56 @@ Queue* createQueue() {
     return newQueue;
 }
 
-UsedBatch* createUsedBatch(Batch* batch) {
-    UsedBatch* newUsedBatch = (UsedBatch*)malloc(sizeof(UsedBatch));
-    if(newUsedBatch == NULL) {
+Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
+
+    Batch* newBatch = (Batch*)malloc(sizeof(Batch));
+    if(newBatch == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
-    newUsedBatch -> batch = batch;
-    newUsedBatch -> next = NULL;
-    newUsedBatch -> previous = NULL;
-    return newUsedBatch;
+    newBatch -> ingredient = strdup(ingredient);
+    newBatch -> expiration = expiration;
+    newBatch -> quantity = quantity;
+    newBatch -> quantityLeft = quantity;
+    newBatch -> next = NULL;
+
+    return newBatch;
 }
 
-UsedBatchList* createUsedBatchList() {
-    UsedBatchList* usedBatchList = (UsedBatchList*)malloc(sizeof(UsedBatchList));
-    if(usedBatchList == NULL) {
+Item* createItem(char* key) {
+    Item* item = (Item*)malloc(sizeof(Item));
+    if (item == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
-    usedBatchList -> head = NULL;
-    return usedBatchList;
+    item -> ingredientKey = strdup(key);
+    item -> list = NULL;
+    item -> isDeleted = false;
+
+    return item;
 }
 
-void appendUsedBatchToUsedList(UsedBatch* usedBatch, UsedBatchList* usedBatchList) {
-
-    //inserisco in testa
-    UsedBatch* temp = usedBatchList -> head;
-    usedBatchList -> head = usedBatch;
-    usedBatch -> next = temp;
+HashTable* createHashTable() {
+    HashTable* newHashTable = (HashTable*)malloc(sizeof(HashTable));
+    if (newHashTable == NULL) {
+        printf("Errore di allocazione della memoria\n");
+        exit(1);
+    }
+    newHashTable -> items = (Item**)malloc(sizeof(Item*) * INITIAL_TABLE_SIZE);
+    newHashTable -> size = INITIAL_TABLE_SIZE;
+    newHashTable -> count = 0;
+    //inizializzo tutte le celle dell'hash table a NULL
+    for (int i = 0; i < newHashTable -> size; i++) {
+        newHashTable -> items[i] = NULL;
+    }
+    return newHashTable;
 }
 
-void appendIngredientToList(Node* newNode, List* list){
+//
+//funzioni append, insert
+//
+
+void appendIngredientToRecipe(Node* newNode, List* list){
 
     if(list -> head == NULL) {
         list -> head = newNode;
@@ -279,43 +326,7 @@ void appendRecipeToList(Recipe* newRecipe, RecipeList* list) {
     }
 }
 
-Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
-
-    Batch* newBatch = (Batch*)malloc(sizeof(Batch));
-    if(newBatch == NULL) {
-        printf("Errore di allocazione della memoria\n");
-        exit(1);
-    }
-    newBatch -> ingredient = strdup(ingredient);
-    newBatch -> expiration = expiration;
-    newBatch -> quantity = quantity;
-    newBatch -> quantityLeft = quantity;
-    newBatch -> next = NULL;
-
-    return newBatch;
-}
-
-InternalList* createInternalList() {
-    InternalList* newList = (InternalList*)malloc(sizeof(InternalList));
-    if (newList == NULL) {
-        printf("Errore di allocazione della memoria\n");
-        exit(1);
-    }
-    newList->head = NULL;
-    return newList;
-}
-
-ListOfList* createListOfLists() {
-    ListOfList* newListOfLists = (ListOfList*)malloc(sizeof(ListOfList));
-    if (newListOfLists == NULL) {
-        printf("Errore di allocazione della memoria\n");
-        exit(1);
-    }
-    newListOfLists -> head = NULL;
-    newListOfLists -> modified = false;
-    return newListOfLists;
-}
-
+/*
 void fixSuccesorBatch(Batch* currentBatch, bool modified) {
 
     while(currentBatch != NULL) {
@@ -329,7 +340,8 @@ void fixSuccesorBatch(Batch* currentBatch, bool modified) {
         currentBatch = currentBatch -> next;
     }
 }
-
+*/
+/*
 //la internal list viene ordinata in ordine di expiration
 //scadenza più vicina -> scadenza più lontana
 void appendToInternalList(InternalList* list, Batch* newNode, bool modified) {
@@ -371,9 +383,11 @@ void appendToInternalList(InternalList* list, Batch* newNode, bool modified) {
         newNode -> next = NULL;
     }
 }
+*/
 
-void appendToListOfLists(ListNode* lastNode, InternalList* newInternalList, ListOfList* listOfLists) {
-    ListNode* newListNode = (ListNode*)malloc(sizeof(ListNode));
+/*
+void appendToListOfLists(Item* lastNode, InternalList* newInternalList, HashTable* listOfLists) {
+    Item* newListNode = (Item*)malloc(sizeof(Item));
     if (newListNode == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
@@ -383,52 +397,134 @@ void appendToListOfLists(ListNode* lastNode, InternalList* newInternalList, List
 
     if(lastNode != NULL) {
         //inserisco in mezzo o in coda
-        ListNode* nextNode = lastNode -> next;
+        Item* nextNode = lastNode -> next;
         lastNode -> next = newListNode;
         newListNode -> next = nextNode;
     }else {
         //inserisco in testa
-        ListNode* oldHead = listOfLists -> head;
+        Item* oldHead = listOfLists -> head;
         listOfLists -> head = newListNode;
         newListNode -> next = oldHead;
     }
 }
+*/
 
-void insertBatchInWareHouse(ListOfList* listOfLists, Batch* newBatch) {
+void appendToInternalList(Batch* head, Batch* newNode) {
 
-    ListNode* temp = listOfLists -> head;
-    ListNode* last = NULL;
-
-    if(listOfLists -> head == NULL) {
-        InternalList* newInternalList = createInternalList();
-        appendToInternalList(newInternalList, newBatch, listOfLists -> modified);
-        appendToListOfLists(last, newInternalList, listOfLists);
+    if (head == NULL) {
+        head = newNode;
+        newNode -> next = NULL;
         return;
     }
 
-    while (temp != NULL) {
-        int cmp = strcmp(temp -> list -> head -> ingredient, newBatch -> ingredient);
-        if(cmp < 0) {
-            last = temp;
-            temp = temp -> next;
+    Batch* currentBatch = head;
+    Batch* last = NULL;
 
-        }else if(cmp == 0){
-            //aggiungo in lista interna
-            appendToInternalList(temp -> list, newBatch, listOfLists -> modified);
-            return;
+    while(currentBatch != NULL) {
 
+        if(currentBatch -> expiration <= newNode -> expiration) {
+            last = currentBatch;
+            currentBatch = currentBatch -> next;
         }else {
-            //superato ordine alfabetico di newBatch
-            InternalList* newInternalList = createInternalList();
-            appendToInternalList(newInternalList, newBatch, listOfLists -> modified);
-            appendToListOfLists(last, newInternalList, listOfLists);
+            if(last == NULL) {
+                newNode -> next = head;
+                head = newNode;
+            }else {
+                last -> next = newNode;
+                newNode -> next = currentBatch;
+            }
             return;
         }
     }
-    //creo lista interna dopo il nodo last
-    InternalList* newInternalList = createInternalList();
-    appendToInternalList(newInternalList, newBatch, listOfLists -> modified);
-    appendToListOfLists(last, newInternalList, listOfLists);
+    //inserimento in coda dopo aver scorso tutta la lista
+    if(last == NULL) {
+        //inserimento in coda con un solo elemento (non dovrebbe succedere)
+        head -> next = newNode;
+        newNode -> next = NULL;
+    }else {
+        last -> next = newNode;
+        newNode -> next = NULL;
+    }
+}
+
+
+void insertBatchInWareHouse(HashTable* table, Batch* newBatch) {
+
+    double loadFactor = (double)table -> count / (double)table -> size;
+    if(loadFactor > LOAD_FACTOR_THRESHOLD) {
+        resize(table);
+    }
+    Item* newItem = NULL;
+    char* ingredientKey = newBatch -> ingredient;
+
+    unsigned int index = hashFunction(ingredientKey, table->size);
+    unsigned int step = hashFunction2(ingredientKey, table->size);
+
+    for (int i = 0; i < table -> size; i++) {
+        int tryIndex = (index + i * step) % table->size;
+
+        if (table->items[tryIndex] == NULL) {
+            newItem = createItem(ingredientKey);
+            newItem -> list = newBatch;
+            newBatch -> next = NULL;
+            table->items[tryIndex] = newItem;
+            table->count++;
+            return;
+        }
+
+        if (table->items[tryIndex]->isDeleted) {
+            newItem = createItem(ingredientKey);
+            newItem -> list = newBatch;
+            newBatch -> next = NULL;
+            table->items[tryIndex] = newItem;
+            table->count++;
+            return;
+        }
+
+        if (strcmp(table -> items[tryIndex] -> ingredientKey, ingredientKey) == 0) {
+            Batch* headBatch = table -> items[tryIndex] -> list;
+            //scorro la lista interna e inserisco il nuovo batch in ordine di expiration
+            appendToInternalList(headBatch, newBatch);
+            return;
+        }
+    }
+    //per debug
+    printf("-------------------------error in insert hash table");
+}
+
+void resize(HashTable* table) {
+
+    int newSize = table -> size * 2;
+    Batch* newBatch = NULL;
+    //inizializzo nuovi items a NULL
+    Item** newItems = (Item**)malloc(newSize * sizeof(Item*));
+
+    for (int i = 0; i < newSize; i++) {
+        newItems[i] = NULL;
+    }
+
+    Item** oldItems = table -> items;
+    int oldSize = table -> size;
+
+    // Aggiorna la tabella con la nuova size, count e items
+    table -> size = newSize;
+    table -> count = 0;
+    table -> items = newItems;
+
+    for (int i = 0; i < oldSize; i++) {
+        if (oldItems[i] != NULL && !oldItems[i] -> isDeleted) {
+            Item* item = oldItems[i];
+            Batch* batch = item -> list;
+
+            while (batch != NULL) {
+                newBatch = createNodeBatch(batch -> ingredient, batch -> expiration, batch -> quantity);
+                insertBatchInWareHouse(table, newBatch);
+                batch = batch->next;
+            }
+        }
+    }
+
+    free(oldItems);
 }
 
 void appendOrderInQueue(Order* newOrder, Queue* waitQueue) {
@@ -542,6 +638,11 @@ void removeOrderInQueue(Queue* queue) {
     }
 }
 
+
+//
+//funzioni check
+//
+
 Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
 
     Recipe* temp = list -> head;
@@ -563,12 +664,69 @@ Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
     return NULL;
 }
 
+int searchIngredientInHashTable(HashTable* table, char* ingredientKey, int currentTime, int quantityToFind) {
+
+    unsigned int index = hashFunction(ingredientKey, table->size);
+    unsigned int step = hashFunction2(ingredientKey, table->size);
+    Batch* currentBatch = NULL;
+
+    for (int i = 0; i < table->size; i++) {
+        int tryIndex = (index + i * step) % table->size;
+
+        if (table->items[tryIndex] == NULL) {
+            return -1;
+        }
+
+        if (!table->items[tryIndex]->isDeleted && strcmp(table->items[tryIndex]->ingredientKey, ingredientKey) == 0) {
+            currentBatch = table -> items[tryIndex] -> list;
+            //scorro la lista interna e cerco la quantità di ingrediente richiesta
+            while(currentBatch != NULL) {
+                if(currentBatch -> expiration > currentTime) {
+                    currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
+                    quantityToFind = quantityToFind - currentBatch -> quantity;
+                    if(quantityToFind <= 0)
+                        return tryIndex;
+                }else {
+                    currentBatch -> quantityLeft = 0;
+                    //devo eliminare il batch scaduto
+                }
+                currentBatch = currentBatch -> next;
+            }
+        }
+    }
+    //restituisco -1
+    return -1;
+}
+
+
+bool searchIngredient(HashTable* table, Order* order, int currentTime) {
+
+    Node* currentIngredient = order -> ingredientList -> head;
+    int index;
+    int quantityOrder = order -> quantity;
+
+    while(currentIngredient != NULL) {
+
+        index = searchIngredientInHashTable(table, currentIngredient -> ingredientName, currentTime, currentIngredient -> quantity * quantityOrder);
+        if(index != -1) {
+            return false;
+        }else {
+            //salvo chiavi hash per poi poterle usare per rimuovere gli ingredienti
+
+        }
+    }
+    //sistemo la lista di ingredienti prima di fare return
+
+    return true;
+}
+
+/*
 //restituisco 0 se non c'è nulla da sistemare
 //restituisco 1 se ho sistemato quantity
 //restituisco 2 se cancello batch e cancello listNode (testa di listOfLists)
 //restituisco 3 se cancello batch e cancello listNode (non in testa di listOfLists)
 //restituisco 4 se cancello batch
-int fixBatchWareHouse(Batch* currentBatch, Batch* lastBatch, ListNode* currentNode, ListNode* lastNode, ListOfList* wareHouseListofLists) {
+int fixBatchWareHouse(Batch* currentBatch, Batch* lastBatch, Item* currentNode, Item* lastNode, HashTable* wareHouseListofLists) {
 
     //se nella chiamata del metodo precedente ho tolto (virtualmente)
     if(currentBatch -> quantityLeft < currentBatch -> quantity) {
@@ -580,7 +738,7 @@ int fixBatchWareHouse(Batch* currentBatch, Batch* lastBatch, ListNode* currentNo
                     //devo cancellare il nodo in testa (non ci sono altri batch)
                     //oltre cancellare il nodo in testa cancello anche il currentNode perchè la sua lista ormai sarà vuota
                     temp = currentBatch;
-                    ListNode* tempNode = NULL;
+                    Item* tempNode = NULL;
                     //controllo se siamo in cima alla lista di liste
                     if(lastNode == NULL) {
                         //controllo se ci sono altri nodi oltre la testa
@@ -632,10 +790,10 @@ int fixBatchWareHouse(Batch* currentBatch, Batch* lastBatch, ListNode* currentNo
     return 0;
 }
 
-bool checkIfIngredientIsPresentInNotModifiedWareHouse(ListOfList* wareHouseListofLists, Order* order, int currentTime) {
+bool checkIfIngredientIsPresentInNotModifiedWareHouse(HashTable* wareHouseListofLists, Order* order, int currentTime) {
 
-    ListNode* currentNode = wareHouseListofLists -> head;
-    ListNode* lastNode = NULL;
+    Item* currentNode = wareHouseListofLists -> head;
+    Item* lastNode = NULL;
     Node* currentIngredient = order -> ingredientList -> head;
     int quantityOrder = order -> quantity;
     bool ingredientFound = false;
@@ -725,10 +883,10 @@ bool checkIfIngredientIsPresentInNotModifiedWareHouse(ListOfList* wareHouseListo
     }
 }
 
-bool checkIfIngredientIsPresentInModifiedWareHouse(ListOfList* wareHouseListofLists, Order* order, int currentTime, int numberIngredientToFind, int numberIngredientFound) {
+bool checkIfIngredientIsPresentInModifiedWareHouse(HashTable* wareHouseListofLists, Order* order, int currentTime, int numberIngredientToFind, int numberIngredientFound) {
 
-    ListNode* currentNode = wareHouseListofLists -> head;
-    ListNode* lastNode = NULL;
+    Item* currentNode = wareHouseListofLists -> head;
+    Item* lastNode = NULL;
     Node* currentIngredient = order -> ingredientList -> head;
     int quantityOrder = order -> quantity;
     bool ingredientFound = false;
@@ -855,7 +1013,7 @@ bool checkIfIngredientIsPresentInModifiedWareHouse(ListOfList* wareHouseListofLi
     }
 }
 
-bool checkIfIngredientIsPresentInWareHouse(ListOfList* wareHouseListofLists, Order* order, int currentTime) {
+bool checkIfIngredientIsPresentInWareHouse(HashTable* wareHouseListofLists, Order* order, int currentTime) {
 
     if(wareHouseListofLists -> modified == true) {
         return checkIfIngredientIsPresentInModifiedWareHouse(wareHouseListofLists, order, currentTime, 1, 0);
@@ -863,7 +1021,7 @@ bool checkIfIngredientIsPresentInWareHouse(ListOfList* wareHouseListofLists, Ord
         return checkIfIngredientIsPresentInNotModifiedWareHouse(wareHouseListofLists, order, currentTime);
     }
 }
-
+*/
 bool checkIfRecipeIsPresentInReadyQueue(Queue* readyQueue, char* recipeName) {
 
     Order* currentOrder = readyQueue -> head;
@@ -878,7 +1036,7 @@ bool checkIfRecipeIsPresentInReadyQueue(Queue* readyQueue, char* recipeName) {
     return false;
 }
 
-void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, int currentTime) {
+void prepareOrder(Queue* waitQueue, Queue* readyQueue, HashTable* listOfLists, int currentTime) {
 
     //scorro tutta la queue e verifico se ogni ordine è preparabile o no
     //se un ordine è preparabile rimuovo gli ingredienti dai batch e sposto l'ordine nella coda degli ordini pronti
@@ -890,7 +1048,7 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
     while (currentOrder != NULL) {
         //itero sugli ingredienti e controllo con checkIfIngredientIsPresentInWarehouse se sono tutti presenti
         //se sono tutti presenti sposto l'ordine in readyQueue e rimuovo gli ingredienti dal magazzino
-        if(checkIfIngredientIsPresentInWareHouse(listOfLists, currentOrder, currentTime)) {
+        if(searchIngredient(listOfLists, currentOrder, currentTime)) {
             //modifiedNow = true;
             //sistemo lista waitQueue
             if(last == NULL){
@@ -926,9 +1084,9 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, ListOfList* listOfLists, 
     */
 }
 
-bool prepareSingleOrder(ListOfList* listofLists, Order* order, int currentTime) {
+bool prepareSingleOrder(HashTable* table, Order* order, int currentTime) {
 
-    return checkIfIngredientIsPresentInWareHouse(listofLists, order, currentTime);
+    return searchIngredient(table, order, currentTime);
 }
 
 void removeNewline(char *str) {
@@ -1038,15 +1196,6 @@ void selectOrderToPutInVan(int capacity, Queue* readyQueue) {
     fillVan(vanQueue);
 
     free(vanQueue);
-    /*
-    if(currentOrder != NULL) {
-        readyQueue -> head = currentOrder;
-    }else {
-        //ready queue svuotata
-        readyQueue -> head = NULL;
-        readyQueue -> tail = NULL;
-    }
-    */
 }
 
 //
@@ -1077,7 +1226,7 @@ void UTILS_commandsHandler() {
     Recipe* recipe = NULL;
 
     RecipeList* recipeList = createRecipeList();
-    ListOfList* listOfLists = createListOfLists();
+    HashTable* listOfLists = createHashTable();
     Queue* waitQueue = createQueue();
     Queue* readyQueue = createQueue();
 
@@ -1114,7 +1263,7 @@ void UTILS_commandsHandler() {
                     //creo ingrediente
                     Node* nodeIngredient = createNodeIngredient(ingredientName, quantity);
                     //aggiungo incrediente alla lista di ingredienti di recipe
-                    appendIngredientToList(nodeIngredient, recipe -> ingredientList);
+                    appendIngredientToRecipe(nodeIngredient, recipe -> ingredientList);
                 }
                 //aggiungo recipe alla lista di recipe
                 appendRecipeToList(recipe, recipeList);
