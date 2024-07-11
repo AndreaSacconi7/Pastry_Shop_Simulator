@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #define MAX_COMMAND_ARGUMENTS 500
 
@@ -102,24 +101,28 @@ void removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** l
 
 unsigned int hashFunction(char* key, int tableSize) {
     unsigned long int value = 0;
-    unsigned int key_len = strlen(key);
+    unsigned int i = 0;
+    //unsigned int key_len = strlen(key);
 
-    for (unsigned int i = 0; i < key_len; i++) {
-        value = value * 37 + key[i];
+    while (key[i] != '\0') {
+        value = (value * 31 + key[i]) % tableSize;
+        i++;
     }
 
-    return value % tableSize;
+    return value;
 }
 
 unsigned int hashFunction2(char* key, int tableSize) {
     unsigned long int value = 0;
-    unsigned int key_len = strlen(key);
+    unsigned int i = 0;
+    //unsigned int key_len = strlen(key);
 
-    for (unsigned int i = 0; i < key_len; i++) {
-        value = value * 31 + key[i];
+    while (key[i] != '\0') {
+        value = (value * 33 + key[i]) % tableSize;
+        i++;
     }
 
-    return (value % (tableSize - 1)) + 1;
+    return value;
 }
 
 
@@ -699,26 +702,34 @@ void removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** l
         (*table) -> items[index] -> isDeleted = true;
         /*(*currentBatch) -> quantity = 0;
         (*currentBatch) -> quantityLeft = 0;*/
-        //Batch* temp = currentBatch;
+        //Batch** temp = currentBatch;
         /*if(lastBatch != NULL)            *lastBatch = NULL;*/
+        //free((*currentBatch)->ingredient);
+        //free(*currentBatch);
+
         *currentBatch = NULL;
+        //free(*temp);
         //return NULL;
     }else if(lastBatch == NULL || *lastBatch == NULL) {
         //cancello testa della lista iterna ma ci sono altri elementi nella lista interna quindi sposto solo la testa
         (*table) -> items[index] -> list = (*currentBatch) -> next;
-        Batch* temp = *currentBatch;
+        //Batch** temp = currentBatch;
         /*if(lastBatch != NULL)
             *lastBatch = NULL;*/
+        //free((*currentBatch)->ingredient);
+        //free(*currentBatch);
+
         *currentBatch = (*currentBatch) -> next;
-        //free(temp);
+        //free(*temp);
         //return (*currentBatch) -> next;
     }else {
         //cancello nodo interno della lista interna
-        Batch* temp = *currentBatch;
+        //Batch* temp = *currentBatch;
         (*lastBatch) -> next = (*currentBatch) -> next;
         //*lastBatch = *currentBatch;
+        //free(*currentBatch);
         *currentBatch = (*currentBatch) -> next;
-        free(temp);
+        //free(temp);
         //return (*currentBatch) -> next;
     }
 }
@@ -736,7 +747,7 @@ void fixHashTable(HashTable** table, ModifiedIndex* modifiedIndexHead, int curre
             /*if(currentBatch -> expiration <= currentTime) {
                 currentBatch -> quantityLeft = -1;
             }*/
-            if(isModified == true) {
+            if(isModified == true || currentBatch -> expiration <= currentTime) {
 
                 if(currentBatch -> quantityLeft < currentBatch -> quantity) {
                     if(currentBatch -> quantityLeft <= 0) {
@@ -803,8 +814,11 @@ int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int curr
                 }else {
                     currentBatch -> quantity = 0;
                     currentBatch -> quantityLeft = -1;
+                    indexModified = tryIndex;
+                    lastBatch = currentBatch;
+                    currentBatch = currentBatch -> next;
                     //devo eliminare il batch scaduto
-                    removeBatchFromHashTable(table, &currentBatch, &lastBatch, tryIndex);
+                    //removeBatchFromHashTable(table, &currentBatch, &lastBatch, tryIndex);
                     //i valori di currentBatch e lastBatch sono stati aggiornati in removeBatchFromHashTable
                     //lastBatch non varia in nessun caso
                     //printf("x");
