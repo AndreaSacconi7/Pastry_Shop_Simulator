@@ -298,7 +298,8 @@ void freeBatch(Batch* head){
     Batch* temp;
     while(currentBatch != NULL){
         temp = currentBatch -> next;
-        free(currentBatch -> ingredient);
+        if(currentBatch -> ingredient != NULL)
+            free(currentBatch -> ingredient);
         free(currentBatch);
         currentBatch = temp;
     }
@@ -621,7 +622,9 @@ void resize(HashTable** table, int currentTime) {
                 batch = temp;
             }
         }
-        free(oldItems[i]->ingredientKey);
+        if(oldItems[i] != NULL) {
+            free(oldItems[i] -> ingredientKey);
+        }
         free(oldItems[i]);
     }
 
@@ -803,7 +806,8 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
                     }else if(lastBatch == NULL) {
                         //cancello testa della lista iterna ma ci sono altri elementi nella lista interna quindi sposto solo la testa
                         temp = currentBatch -> next;
-                        free(currentBatch -> ingredient);
+                        if(currentBatch -> ingredient != NULL)
+                            free(currentBatch -> ingredient);
                         free(currentBatch);
                         (*table) -> items[index] -> list = temp;
                         //Batch** temp = currentBatch;
@@ -819,7 +823,8 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
                         //Batch* temp = *currentBatch;
                         lastBatch -> next = currentBatch -> next;
                         temp = currentBatch -> next;
-                        free(currentBatch -> ingredient);
+                        if(currentBatch -> ingredient != NULL)
+                            free(currentBatch -> ingredient);
                         free(currentBatch);
                         //*lastBatch = *currentBatch;
                         //free(*currentBatch);
