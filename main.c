@@ -92,7 +92,7 @@ typedef struct Queue {
 //prototipi funzioni
 //
 void resize(HashTable** table, int currentTime);
-Batch* removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** lastBatch, int index);
+void removeBatchFromHashTable(HashTable** table, Batch** headBatch, int index, bool isModified, int currentTime);
 
 
 //
@@ -175,7 +175,7 @@ Order* createOrder(char* recipeName, int quantity, int currentTime) {
         exit(1);
     }
     newOrder -> next = NULL;
-    newOrder -> recipeName = recipeName;
+    newOrder -> recipeName = strdup(recipeName);
     newOrder -> quantity = quantity;
     newOrder -> weight = 0;
     newOrder -> time = currentTime;
@@ -250,6 +250,70 @@ HashTable* createHashTable() {
         newHashTable -> items[i] = NULL;
     }
     return newHashTable;
+}
+
+void freeIngredientList(List* list){
+
+    Node* currentIngredient = list -> head;
+    Node* temp;
+    while(currentIngredient != NULL){
+        temp = currentIngredient -> next;
+        free(currentIngredient -> ingredientName);
+        free(currentIngredient);
+        currentIngredient = temp;
+    }
+}
+
+void freeRecipeInList(RecipeList* list){
+
+    Recipe* currentRecipe = list -> head;
+    Recipe* temp;
+    while(currentRecipe != NULL){
+        temp = currentRecipe -> next;
+        freeIngredientList(currentRecipe -> ingredientList);
+        free(currentRecipe -> ingredientList);
+        free(currentRecipe -> name);
+        free(currentRecipe);
+        currentRecipe = temp;
+    }
+}
+
+void freeOrders(Queue* queue){
+
+    Order* currentOrder = queue -> head;
+    Order* temp;
+
+    while(currentOrder != NULL){
+        temp = currentOrder->next;
+        //freeIngredientList(currentOrder -> ingredientList);
+        free(currentOrder -> recipeName);
+        free(currentOrder);
+        currentOrder = temp;
+    }
+}
+
+void freeBatch(Batch* head){
+
+    Batch* currentBatch = head;
+    Batch* temp;
+    while(currentBatch != NULL){
+        temp = currentBatch -> next;
+        free(currentBatch -> ingredient);
+        free(currentBatch);
+        currentBatch = temp;
+    }
+}
+
+void freeHashTable(HashTable* table){
+
+    for (int i = 0; i < table -> size; i++) {
+        if(table -> items[i] != NULL){
+            freeBatch(table -> items[i] -> list);
+            free(table -> items[i] -> ingredientKey);
+        }
+        free(table -> items[i]);
+    }
+    free(table -> items);
 }
 
 //
@@ -692,91 +756,107 @@ Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
     return NULL;
 }
 
-Batch* removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** lastBatch, int index) {
+void removeBatchFromHashTable(HashTable** table, Batch** headBatch, int index, bool isModified, int currentTime) {
 
-    if((lastBatch == NULL || *lastBatch == NULL) && (*currentBatch) -> next == NULL) {
-        //cancello testa della lista interna senza che ci siano altri elementi quindi pongo isDeleted a true
-        (*table) -> items[index] -> isDeleted = true;
-        (*table) -> count--;
-        /*(*currentBatch) -> quantity = 0;
-        (*currentBatch) -> quantityLeft = 0;*/
-        //Batch** temp = currentBatch;
-        /*if(lastBatch != NULL)            *lastBatch = NULL;*/
-        //free((*currentBatch)->ingredient);
-        //free(*currentBatch);
+    Batch* lastBatch = NULL;
+    Batch* currentBatch = *headBatch;
+    Batch* temp;
 
-        //*currentBatch = NULL;
-        return NULL;
-    }else if(lastBatch == NULL || *lastBatch == NULL) {
-        //cancello testa della lista iterna ma ci sono altri elementi nella lista interna quindi sposto solo la testa
-        (*table) -> items[index] -> list = (*currentBatch) -> next;
-        //Batch** temp = currentBatch;
-        /*if(lastBatch != NULL)
-            *lastBatch = NULL;*/
-        //free((*currentBatch)->ingredient);
-        //free(*currentBatch);
+    while(currentBatch != NULL) {
+        //se ingrediente scaduto lo pongo a 0 così che poi lo elimino sotto
+        /*if(currentBatch -> expiration <= currentTime) {
+            currentBatch -> quantityLeft = -1;
+        }*/
+        if(isModified == true || currentBatch -> expiration <= currentTime) {
 
-        //*currentBatch = (*currentBatch) -> next;
-        return (*currentBatch) -> next;
-    }else {
-        //cancello nodo interno della lista interna
-        //Batch* temp = *currentBatch;
-        (*lastBatch) -> next = (*currentBatch) -> next;
-        //*lastBatch = *currentBatch;
-        //free(*currentBatch);
-        //*currentBatch = (*currentBatch) -> next;
-        return (*currentBatch) -> next;
+            if(currentBatch -> quantityLeft < currentBatch -> quantity) {
+                if(currentBatch -> quantityLeft <= 0) {
+                    currentBatch -> quantityLeft = -1;
+                    currentBatch -> quantity = 0;
+                    //currentBatch -> quantity = currentBatch -> quantityLeft;
+                    //devo cancellare il batch
+
+                    //elimino il batch !!
+                    if(lastBatch == NULL && currentBatch -> next == NULL) {
+                        //cancello testa della lista interna senza che ci siano altri elementi quindi pongo isDeleted a true
+                        (*table) -> items[index] -> isDeleted = true;
+                        (*table) -> count--;
+                        temp = NULL;
+                        /*(*currentBatch) -> quantity = 0;
+                        (*currentBatch) -> quantityLeft = 0;*/
+                        //Batch** temp = currentBatch;
+                        /*if(lastBatch != NULL)            *lastBatch = NULL;*/
+                        //free((*currentBatch)->ingredient);
+                        //free(*currentBatch);
+
+                        //*currentBatch = NULL;
+                        //return NULL;
+                    }else if(lastBatch == NULL) {
+                        //cancello testa della lista iterna ma ci sono altri elementi nella lista interna quindi sposto solo la testa
+                        (*table) -> items[index] -> list = currentBatch -> next;
+                        temp = currentBatch -> next;
+                        free(currentBatch -> ingredient);
+                        free(currentBatch);
+                        //Batch** temp = currentBatch;
+                        /*if(lastBatch != NULL)
+                            *lastBatch = NULL;*/
+                        //free((*currentBatch)->ingredient);
+                        //free(*currentBatch);
+
+                        //*currentBatch = (*currentBatch) -> next;
+                        //return currentBatch -> next;
+                    }else {
+                        //cancello nodo interno della lista interna
+                        //Batch* temp = *currentBatch;
+                        lastBatch -> next = currentBatch -> next;
+                        temp = currentBatch -> next;
+                        free(currentBatch -> ingredient);
+                        free(currentBatch);
+                        //*lastBatch = *currentBatch;
+                        //free(*currentBatch);
+                        //*currentBatch = (*currentBatch) -> next;
+                        //return (*currentBatch) -> next;
+                    }
+                    currentBatch = temp;
+                    //fixHashTable(table, currentIndex, currentTime, isModified);
+                    //return;
+                    //i valori di currentBatch e lastBatch sono stati aggiornati in removeBatchFromHashTable
+                    //lastBatch non varia in nessun caso
+                }else {
+                    //aggiorno il valore di quantity a quantityLeft
+                    currentBatch -> quantity = currentBatch -> quantityLeft;
+                    lastBatch = currentBatch;
+                    currentBatch = currentBatch -> next;
+                }
+            }else {
+                lastBatch = currentBatch;
+                currentBatch = currentBatch -> next;
+            }
+        }else {
+            //ripristino il valore di quantityLeft
+            currentBatch -> quantityLeft = currentBatch -> quantity;
+            lastBatch = currentBatch;
+            currentBatch = currentBatch -> next;
+        }
     }
 }
 
 void fixHashTable(HashTable** table, ModifiedIndex* modifiedIndexHead, int currentTime, bool isModified) {
 
     ModifiedIndex* currentIndex = modifiedIndexHead;
+    ModifiedIndex* temp;
     Batch* currentBatch = NULL;
-    Batch* lastBatch = NULL;
-    Batch* nextBatch = NULL;
+    //Batch* lastBatch = NULL;
+    //Batch* nextBatch = NULL;
     while(currentIndex != NULL) {
-        lastBatch = NULL;
+        //lastBatch = NULL;
         currentBatch = (*table) -> items[currentIndex -> index] -> list;
-        while(currentBatch != NULL) {
-            //se ingrediente scaduto lo pongo a 0 così che poi lo elimino sotto
-            /*if(currentBatch -> expiration <= currentTime) {
-                currentBatch -> quantityLeft = -1;
-            }*/
-            if(isModified == true || currentBatch -> expiration <= currentTime) {
 
-                if(currentBatch -> quantityLeft < currentBatch -> quantity) {
-                    if(currentBatch -> quantityLeft <= 0) {
-                        currentBatch -> quantityLeft = -1;
-                        currentBatch -> quantity = 0;
-                        //currentBatch -> quantity = currentBatch -> quantityLeft;
-                        //devo cancellare il batch
-                        Batch* temp = currentBatch;
-                        nextBatch = removeBatchFromHashTable(table, &currentBatch, &lastBatch, currentIndex -> index);
-                        free(temp);
-                        currentBatch = nextBatch;
-                        //fixHashTable(table, currentIndex, currentTime, isModified);
-                        //return;
-                        //i valori di currentBatch e lastBatch sono stati aggiornati in removeBatchFromHashTable
-                        //lastBatch non varia in nessun caso
-                    }else {
-                        //aggiorno il valore di quantity a quantityLeft
-                        currentBatch -> quantity = currentBatch -> quantityLeft;
-                        lastBatch = currentBatch;
-                        currentBatch = currentBatch -> next;
-                    }
-                }else {
-                    lastBatch = currentBatch;
-                    currentBatch = currentBatch -> next;
-                }
-            }else {
-                //ripristino il valore di quantityLeft
-                currentBatch -> quantityLeft = currentBatch -> quantity;
-                lastBatch = currentBatch;
-                currentBatch = currentBatch -> next;
-            }
-        }
-        currentIndex = currentIndex -> next;
+        removeBatchFromHashTable(table, &currentBatch, currentIndex -> index, isModified, currentTime);
+
+        temp = currentIndex -> next;
+        free(currentIndex);
+        currentIndex = temp;
     }
 }
 
@@ -989,6 +1069,7 @@ void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* ready
                 }else {
                     recipeList -> head = currentRecipe -> next;
                 }
+                free(currentRecipe -> name);
                 free(currentRecipe);
             }else {
                 printf("ordini in sospeso\n");
@@ -1011,9 +1092,10 @@ void fillVan(Queue* vanQueue) {
     Order* temp = NULL;
     while (currentOrder != NULL) {
         printf("%d %s %d\n", currentOrder -> time, currentOrder -> recipeName, currentOrder -> quantity);
-        temp = currentOrder;
-        currentOrder = currentOrder -> next;
-        free(temp);
+        temp = currentOrder -> next;
+        free(currentOrder -> recipeName);
+        free(currentOrder);
+        currentOrder = temp;
     }
 }
 
@@ -1143,6 +1225,7 @@ void UTILS_commandsHandler() {
                     quantity = atoi(commandArgumentHolder);
                     //creo ingrediente
                     Node* nodeIngredient = createNodeIngredient(ingredientName, quantity);
+                    free(ingredientName);
                     //aggiungo incrediente alla lista di ingredienti di recipe
                     appendIngredientToRecipe(nodeIngredient, recipe -> ingredientList);
                 }
@@ -1158,6 +1241,7 @@ void UTILS_commandsHandler() {
             recipeName = strdup(commandArgumentHolder);
             //rimuovo ricetta da hash table
             removeRecipeFromList(recipeName, recipeList, readyQueue, waitQueue);
+            free(recipeName);
             break;
         case rifornimento_HASH:
             while ((commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER)) != NULL) {
@@ -1170,6 +1254,7 @@ void UTILS_commandsHandler() {
                 Batch* batch = createNodeBatch(ingredientName, expiration, quantity);
                 //inserisco Batch nel magazzino (hash table)
                 insertBatchInHashTable(&table, batch, currentTime);
+                free(ingredientName);
                 //printHashTable(listOfLists);
                 //printf("\n");
             }
@@ -1190,6 +1275,7 @@ void UTILS_commandsHandler() {
                 //creo ordine
                 order = createOrder(recipeName, quantity, currentTime);
                 order -> ingredientList = recipe -> ingredientList;
+                free(recipeName);
                 //invio ordine (poi si deve verificare se l'ordine può essere elaborato o no in base alle scorte, lotti in magazzino)
                 //controllo subito se l'ordine può essere preparato. in tal caso lo metto direttamente in readyQueue
                 if(prepareSingleOrder(&table, order, currentTime)) {
@@ -1220,6 +1306,15 @@ void UTILS_commandsHandler() {
         selectOrderToPutInVan(capacity, readyQueue);
     }
     printHashTable(table);
+    //dealloco le strutture dati
+    freeOrders(readyQueue);
+    freeOrders(waitQueue);
+    free(readyQueue);
+    free(waitQueue);
+    freeRecipeInList(recipeList);
+    free(recipeList);
+    freeHashTable(table);
+    free(table);
 }
 
 
