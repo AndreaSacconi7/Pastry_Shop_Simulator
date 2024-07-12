@@ -92,7 +92,7 @@ typedef struct Queue {
 //prototipi funzioni
 //
 void resize(HashTable** table, int currentTime);
-void removeBatchFromHashTable(HashTable** table, Batch** headBatch, int index, bool isModified, int currentTime);
+void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int currentTime);
 
 
 //
@@ -118,7 +118,7 @@ unsigned int hashFunction2(char* key, int tableSize) {
     //unsigned int key_len = strlen(key);
 
     while (key[i] != '\0') {
-        value = (value * 33 + key[i]) % tableSize;
+        value = (value * 37 + key[i]) % tableSize;
         i++;
     }
 
@@ -565,8 +565,8 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
             if ((*table)->items[tryIndex]->isDeleted) {
                 //se la cella è stata cancellata devo inserire il nuovo batch nella cella in cima
                 //libero memoria occupata dal vecchio batch
-                free((*table)->items[tryIndex]->list->ingredient);
-                free((*table)->items[tryIndex]->list);
+                //free((*table)->items[tryIndex]->list->ingredient);
+                freeBatch((*table)->items[tryIndex]->list);
                 (*table)->items[tryIndex]->list = newBatch;
                 (*table)->items[tryIndex]->isDeleted = false;
                 //libero memoria della vecchia stringa
@@ -591,7 +591,7 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
 void resize(HashTable** table, int currentTime) {
 
     int newSize = (*table) -> size * 2;
-    Batch* newBatch = NULL;
+    //Batch* newBatch = NULL;
     //inizializzo nuovi items a NULL
     Item** newItems = (Item**)malloc(newSize * sizeof(Item*));
 
@@ -611,13 +611,18 @@ void resize(HashTable** table, int currentTime) {
         if (oldItems[i] != NULL && !oldItems[i] -> isDeleted) {
             Item* item = oldItems[i];
             Batch* batch = item -> list;
+            Batch* temp;
 
             while (batch != NULL) {
-                newBatch = createNodeBatch(batch -> ingredient, batch -> expiration, batch -> quantity);
-                insertBatchInHashTable(table, newBatch, currentTime);
-                batch = batch->next;
+                temp = batch -> next;
+                batch -> next = NULL;
+                //newBatch = createNodeBatch(batch -> ingredient, batch -> expiration, batch -> quantity);
+                insertBatchInHashTable(table, batch, currentTime);
+                batch = temp;
             }
         }
+        free(oldItems[i]->ingredientKey);
+        free(oldItems[i]);
     }
 
     free(oldItems);
@@ -760,10 +765,10 @@ Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
     return NULL;
 }
 
-void removeBatchFromHashTable(HashTable** table, Batch** headBatch, int index, bool isModified, int currentTime) {
+void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int currentTime) {
 
     Batch* lastBatch = NULL;
-    Batch* currentBatch = *headBatch;
+    Batch* currentBatch = (*table) -> items[index] -> list;
     Batch* temp;
 
     while(currentBatch != NULL) {
@@ -849,14 +854,14 @@ void fixHashTable(HashTable** table, ModifiedIndex* modifiedIndexHead, int curre
 
     ModifiedIndex* currentIndex = modifiedIndexHead;
     ModifiedIndex* temp;
-    Batch* currentBatch = NULL;
+    //Batch* currentBatch = NULL;
     //Batch* lastBatch = NULL;
     //Batch* nextBatch = NULL;
     while(currentIndex != NULL) {
         //lastBatch = NULL;
-        currentBatch = (*table) -> items[currentIndex -> index] -> list;
+        //currentBatch = (*table) -> items[currentIndex -> index] -> list;
 
-        removeBatchFromHashTable(table, &currentBatch, currentIndex -> index, isModified, currentTime);
+        removeBatchFromHashTable(table, currentIndex -> index, isModified, currentTime);
 
         temp = currentIndex -> next;
         free(currentIndex);
@@ -1188,6 +1193,7 @@ void UTILS_commandsHandler() {
     int quantity, expiration;
     int tmp;
     Order* order = NULL;
+    Batch* batch = NULL;
     int periodicity = 0;
     int capacity = 0;
     int currentTime = 0;
@@ -1257,10 +1263,13 @@ void UTILS_commandsHandler() {
                 commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
                 expiration = atoi(commandArgumentHolder);
                 //creo Batch
-                Batch* batch = createNodeBatch(ingredientName, expiration, quantity);
+                batch = createNodeBatch(ingredientName, expiration, quantity);
                 //inserisco Batch nel magazzino (hash table)
                 insertBatchInHashTable(&table, batch, currentTime);
                 free(ingredientName);
+                batch = NULL;
+                //free(batch->ingredient);
+                //free(batch);
                 //printHashTable(listOfLists);
                 //printf("\n");
             }
@@ -1295,6 +1304,7 @@ void UTILS_commandsHandler() {
             }else {
                 printf("rifiutato\n");
             }
+            order = NULL;
             free(recipeName);
             break;
         default:
@@ -1313,6 +1323,8 @@ void UTILS_commandsHandler() {
     }
     //printHashTable(table);
     //dealloco le strutture dati
+    free(order);
+    free(batch);
     freeOrders(readyQueue);
     freeOrders(waitQueue);
     free(readyQueue);
