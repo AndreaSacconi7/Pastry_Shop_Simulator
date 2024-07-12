@@ -308,12 +308,11 @@ void freeHashTable(HashTable* table){
 
     for (int i = 0; i < table -> size; i++) {
         if(table -> items[i] != NULL){
-            freeBatch(table -> items[i] -> list);
+            //freeBatch(table -> items[i] -> list);
             free(table -> items[i] -> ingredientKey);
         }
         free(table -> items[i]);
     }
-    free(table -> items);
 }
 
 //
@@ -565,8 +564,13 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
             //controllo se la cella è stata cancellata
             if ((*table)->items[tryIndex]->isDeleted) {
                 //se la cella è stata cancellata devo inserire il nuovo batch nella cella in cima
+                //libero memoria occupata dal vecchio batch
+                free((*table)->items[tryIndex]->list->ingredient);
+                free((*table)->items[tryIndex]->list);
                 (*table)->items[tryIndex]->list = newBatch;
                 (*table)->items[tryIndex]->isDeleted = false;
+                //libero memoria della vecchia stringa
+                free((*table)->items[tryIndex]->ingredientKey);
                 (*table)->items[tryIndex]->ingredientKey = strdup(ingredientKey);
                 newBatch -> next = NULL;
                 (*table)->count++;
@@ -793,10 +797,10 @@ void removeBatchFromHashTable(HashTable** table, Batch** headBatch, int index, b
                         //return NULL;
                     }else if(lastBatch == NULL) {
                         //cancello testa della lista iterna ma ci sono altri elementi nella lista interna quindi sposto solo la testa
-                        (*table) -> items[index] -> list = currentBatch -> next;
                         temp = currentBatch -> next;
                         free(currentBatch -> ingredient);
                         free(currentBatch);
+                        (*table) -> items[index] -> list = temp;
                         //Batch** temp = currentBatch;
                         /*if(lastBatch != NULL)
                             *lastBatch = NULL;*/
@@ -1069,6 +1073,8 @@ void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* ready
                 }else {
                     recipeList -> head = currentRecipe -> next;
                 }
+                freeIngredientList(currentRecipe -> ingredientList);
+                free(currentRecipe -> ingredientList);
                 free(currentRecipe -> name);
                 free(currentRecipe);
             }else {
@@ -1275,7 +1281,6 @@ void UTILS_commandsHandler() {
                 //creo ordine
                 order = createOrder(recipeName, quantity, currentTime);
                 order -> ingredientList = recipe -> ingredientList;
-                free(recipeName);
                 //invio ordine (poi si deve verificare se l'ordine può essere elaborato o no in base alle scorte, lotti in magazzino)
                 //controllo subito se l'ordine può essere preparato. in tal caso lo metto direttamente in readyQueue
                 if(prepareSingleOrder(&table, order, currentTime)) {
@@ -1290,6 +1295,7 @@ void UTILS_commandsHandler() {
             }else {
                 printf("rifiutato\n");
             }
+            free(recipeName);
             break;
         default:
             return;
@@ -1305,7 +1311,7 @@ void UTILS_commandsHandler() {
         //arriva il furgone. lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
         selectOrderToPutInVan(capacity, readyQueue);
     }
-    printHashTable(table);
+    //printHashTable(table);
     //dealloco le strutture dati
     freeOrders(readyQueue);
     freeOrders(waitQueue);
@@ -1314,6 +1320,7 @@ void UTILS_commandsHandler() {
     freeRecipeInList(recipeList);
     free(recipeList);
     freeHashTable(table);
+    free(table -> items);
     free(table);
 }
 
