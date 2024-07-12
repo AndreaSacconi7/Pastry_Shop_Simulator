@@ -92,7 +92,7 @@ typedef struct Queue {
 //prototipi funzioni
 //
 void resize(HashTable** table, int currentTime);
-void removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** lastBatch, int index);
+Batch* removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** lastBatch, int index);
 
 
 //
@@ -446,10 +446,7 @@ void appendToInternalList(HashTable** table,Batch** head, Batch* newBatch, int c
             currentBatch = currentBatch -> next;
         }else {
             if(last == NULL) {
-                Item* newItem = createItem(newBatch -> ingredient);
-                newItem -> list = newBatch;
-                newBatch -> next = NULL;
-                (*table)->items[index] = newItem;
+                (*table)->items[index]->list = newBatch;
                 newBatch -> next = *head;
                 //*head = newBatch;
             }else {
@@ -504,10 +501,10 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
             //controllo se la cella è stata cancellata
             if ((*table)->items[tryIndex]->isDeleted) {
                 //se la cella è stata cancellata devo inserire il nuovo batch nella cella in cima
-                newItem = createItem(ingredientKey);
-                newItem -> list = newBatch;
+                (*table)->items[tryIndex]->list = newBatch;
+                (*table)->items[tryIndex]->isDeleted = false;
+                (*table)->items[tryIndex]->ingredientKey = strdup(ingredientKey);
                 newBatch -> next = NULL;
-                (*table)->items[tryIndex] = newItem;
                 (*table)->count++;
                 return;
             }
@@ -695,11 +692,12 @@ Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
     return NULL;
 }
 
-void removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** lastBatch, int index) {
+Batch* removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** lastBatch, int index) {
 
     if((lastBatch == NULL || *lastBatch == NULL) && (*currentBatch) -> next == NULL) {
         //cancello testa della lista interna senza che ci siano altri elementi quindi pongo isDeleted a true
         (*table) -> items[index] -> isDeleted = true;
+        (*table) -> count--;
         /*(*currentBatch) -> quantity = 0;
         (*currentBatch) -> quantityLeft = 0;*/
         //Batch** temp = currentBatch;
@@ -707,9 +705,8 @@ void removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** l
         //free((*currentBatch)->ingredient);
         //free(*currentBatch);
 
-        *currentBatch = NULL;
-        //free(*temp);
-        //return NULL;
+        //*currentBatch = NULL;
+        return NULL;
     }else if(lastBatch == NULL || *lastBatch == NULL) {
         //cancello testa della lista iterna ma ci sono altri elementi nella lista interna quindi sposto solo la testa
         (*table) -> items[index] -> list = (*currentBatch) -> next;
@@ -719,18 +716,16 @@ void removeBatchFromHashTable(HashTable** table, Batch** currentBatch, Batch** l
         //free((*currentBatch)->ingredient);
         //free(*currentBatch);
 
-        *currentBatch = (*currentBatch) -> next;
-        //free(*temp);
-        //return (*currentBatch) -> next;
+        //*currentBatch = (*currentBatch) -> next;
+        return (*currentBatch) -> next;
     }else {
         //cancello nodo interno della lista interna
         //Batch* temp = *currentBatch;
         (*lastBatch) -> next = (*currentBatch) -> next;
         //*lastBatch = *currentBatch;
         //free(*currentBatch);
-        *currentBatch = (*currentBatch) -> next;
-        //free(temp);
-        //return (*currentBatch) -> next;
+        //*currentBatch = (*currentBatch) -> next;
+        return (*currentBatch) -> next;
     }
 }
 
@@ -739,6 +734,7 @@ void fixHashTable(HashTable** table, ModifiedIndex* modifiedIndexHead, int curre
     ModifiedIndex* currentIndex = modifiedIndexHead;
     Batch* currentBatch = NULL;
     Batch* lastBatch = NULL;
+    Batch* nextBatch = NULL;
     while(currentIndex != NULL) {
         lastBatch = NULL;
         currentBatch = (*table) -> items[currentIndex -> index] -> list;
@@ -751,9 +747,16 @@ void fixHashTable(HashTable** table, ModifiedIndex* modifiedIndexHead, int curre
 
                 if(currentBatch -> quantityLeft < currentBatch -> quantity) {
                     if(currentBatch -> quantityLeft <= 0) {
-                        currentBatch -> quantity = currentBatch -> quantityLeft;
+                        currentBatch -> quantityLeft = -1;
+                        currentBatch -> quantity = 0;
+                        //currentBatch -> quantity = currentBatch -> quantityLeft;
                         //devo cancellare il batch
-                        removeBatchFromHashTable(table, &currentBatch, &lastBatch, currentIndex -> index);
+                        Batch* temp = currentBatch;
+                        nextBatch = removeBatchFromHashTable(table, &currentBatch, &lastBatch, currentIndex -> index);
+                        free(temp);
+                        currentBatch = nextBatch;
+                        //fixHashTable(table, currentIndex, currentTime, isModified);
+                        //return;
                         //i valori di currentBatch e lastBatch sono stati aggiornati in removeBatchFromHashTable
                         //lastBatch non varia in nessun caso
                     }else {
@@ -782,7 +785,7 @@ int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int curr
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
     unsigned int step = hashFunction2(ingredientKey, (*table)->size);
     Batch* currentBatch = NULL;
-    Batch* lastBatch = NULL;
+    //Batch* lastBatch = NULL;
     int indexModified = -1;
 
     for (int i = 0; i < (*table)->size; i++) {
@@ -799,7 +802,7 @@ int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int curr
             while(currentBatch != NULL) {
                 if(currentBatch -> expiration > currentTime) {
                     //sistemo quantityLeft in caso fosse stato modificato in precedenza senza che poi siano stati effetivamente usati gli ingredienti
-                    if(currentBatch -> quantity > 0) {
+                    if(currentBatch -> quantity > 0 && currentBatch -> quantityLeft > 0) {
                         indexModified = tryIndex;
                         currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
                         quantityToFind = quantityToFind - currentBatch -> quantity;
@@ -809,13 +812,13 @@ int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int curr
                         }
                     }
 
-                    lastBatch = currentBatch;
+                    //lastBatch = currentBatch;
                     currentBatch = currentBatch -> next;
                 }else {
                     currentBatch -> quantity = 0;
                     currentBatch -> quantityLeft = -1;
                     indexModified = tryIndex;
-                    lastBatch = currentBatch;
+                    //lastBatch = currentBatch;
                     currentBatch = currentBatch -> next;
                     //devo eliminare il batch scaduto
                     //removeBatchFromHashTable(table, &currentBatch, &lastBatch, tryIndex);
@@ -881,308 +884,6 @@ bool searchIngredient(HashTable** table, Order* order, int currentTime) {
     return true;
 }
 
-/*
-//restituisco 0 se non c'è nulla da sistemare
-//restituisco 1 se ho sistemato quantity
-//restituisco 2 se cancello batch e cancello listNode (testa di listOfLists)
-//restituisco 3 se cancello batch e cancello listNode (non in testa di listOfLists)
-//restituisco 4 se cancello batch
-int fixBatchWareHouse(Batch* currentBatch, Batch* lastBatch, Item* currentNode, Item* lastNode, HashTable* wareHouseListofLists) {
-
-    //se nella chiamata del metodo precedente ho tolto (virtualmente)
-    if(currentBatch -> quantityLeft < currentBatch -> quantity) {
-        if(currentBatch -> quantityLeft <= 0) {
-            Batch* temp = NULL;
-            //cancello nodo
-            if(lastBatch == NULL) {
-                if(currentBatch -> next == NULL){
-                    //devo cancellare il nodo in testa (non ci sono altri batch)
-                    //oltre cancellare il nodo in testa cancello anche il currentNode perchè la sua lista ormai sarà vuota
-                    temp = currentBatch;
-                    Item* tempNode = NULL;
-                    //controllo se siamo in cima alla lista di liste
-                    if(lastNode == NULL) {
-                        //controllo se ci sono altri nodi oltre la testa
-                        if(currentNode -> next != NULL) {
-
-                            wareHouseListofLists -> head = currentNode -> next;
-                            return 5;
-
-                        }else {
-                            //sono in cima alla lista di liste
-                            wareHouseListofLists -> head = NULL;
-                            tempNode = currentNode;
-                            free(tempNode);
-                            //currentNode = NULL;
-                            free(temp);
-                            //currentBatch = NULL;
-                            return 2;
-                        }
-
-                    }else {
-                        //non sono in cima alla lista di liste
-                        tempNode = currentNode;
-                        lastNode -> next = currentNode -> next;
-                        free(tempNode);
-                        //currentNode = lastNode;
-                        free(temp);
-                        //currentBatch = NULL;
-                        return 3;
-                    }
-                }else {
-                    //cancello batch in testa ma ci sono altri elementi nella internal List
-                    //temp = currentBatch;
-                    currentNode -> list -> head = currentBatch -> next;
-                    //free(temp);
-                    return 6;
-                }
-            }else {
-                //temp = currentBatch;
-                lastBatch -> next = currentBatch -> next;
-                //currentBatch = currentBatch -> next;
-                return 4;
-            }
-        }else {
-            //modifico quantity poichè la quantità è diminuita ma non è finita
-            currentBatch -> quantity = currentBatch -> quantityLeft;
-            return 1;
-        }
-    }
-    return 0;
-}
-
-bool checkIfIngredientIsPresentInNotModifiedWareHouse(HashTable* wareHouseListofLists, Order* order, int currentTime) {
-
-    Item* currentNode = wareHouseListofLists -> head;
-    Item* lastNode = NULL;
-    Node* currentIngredient = order -> ingredientList -> head;
-    int quantityOrder = order -> quantity;
-    bool ingredientFound = false;
-    Batch* lastBatch = NULL;
-
-    while (currentNode != NULL && currentIngredient != NULL) {
-        int cmp = strcmp(currentNode -> list -> head -> ingredient, currentIngredient -> ingredientName);
-        if(cmp == 0) {
-            lastBatch = NULL;
-            Batch* currentBatch = currentNode -> list -> head;
-            //se per preparare 1 torta mi servono 2 uova. per prepararne X mi servono 2*X uova
-            int quantityToFind = currentIngredient -> quantity * quantityOrder;
-            while(!ingredientFound && currentBatch != NULL) {
-
-                //se avevo modificato quantityLeft ma poi non ho realmente tolto gli ingredienti dal magazzino rispristino il valore iniziale
-                currentBatch -> quantityLeft = currentBatch -> quantity;
-                if(currentBatch -> expiration > currentTime) {
-                    currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
-                    quantityToFind = quantityToFind - currentBatch -> quantity;
-                    if(quantityToFind <= 0)
-                        ingredientFound = true;
-
-                    lastBatch = currentBatch;
-                    currentBatch = currentBatch -> next;
-                }else {
-                    //cancello nodo scaduto in base alla casistica
-                    currentBatch -> quantityLeft = 0;
-                    //chiamo metodo fix per cancellare il batch e eventualemnte il currentNode se rimane vuoto
-                    int result = fixBatchWareHouse(currentBatch, lastBatch, currentNode, lastNode, wareHouseListofLists);
-                    switch (result) {
-                    case 2:
-                        lastNode = NULL;
-                        currentNode = NULL;
-                        currentBatch = NULL;
-                        lastBatch = NULL;
-                        break;
-                    case 3:
-                        currentNode = lastNode;
-                        currentBatch = NULL;
-                        lastBatch = NULL;
-                        break;
-                    case 4:
-                        currentBatch = currentBatch -> next;
-                        break;
-                    case 5:
-                        free(currentNode);
-                        free(currentBatch);
-                        return checkIfIngredientIsPresentInNotModifiedWareHouse(wareHouseListofLists, order, currentTime);
-                    case 6:
-                        currentBatch = currentBatch -> next;
-                        break;
-                    default:
-                        //return 0 oppure 1
-                        //printf("error in fix");
-                        break;
-                    }
-                }
-            }
-
-            if(ingredientFound){
-                //sommo i pesi degli ingredienti
-                order -> weight = order -> weight + (currentIngredient -> quantity * quantityOrder);
-                currentIngredient = currentIngredient -> next;
-                ingredientFound = false;
-            }else {
-                order -> weight = 0;
-                return false;
-            }
-
-        }else if(cmp > 0){
-            //non è presente alcun lotto del ingrediente cercato
-            order -> weight = 0;
-            return false;
-        }
-        lastNode = currentNode;
-        if(currentNode != NULL)
-            currentNode = currentNode -> next;
-    }
-    //tutti gli ingredienti trovati
-    //prima di restituire true devo cancellare tutti i batch che utilizzo per preparare l'ordine
-    if(currentIngredient == NULL) {
-        wareHouseListofLists -> modified = true;
-        return true;
-    }else {
-        order -> weight = 0;
-        return false;
-    }
-}
-
-bool checkIfIngredientIsPresentInModifiedWareHouse(HashTable* wareHouseListofLists, Order* order, int currentTime, int numberIngredientToFind, int numberIngredientFound) {
-
-    Item* currentNode = wareHouseListofLists -> head;
-    Item* lastNode = NULL;
-    Node* currentIngredient = order -> ingredientList -> head;
-    int quantityOrder = order -> quantity;
-    bool ingredientFound = false;
-    Batch* lastBatch = NULL;
-    int result;
-
-    while (currentNode != NULL && currentIngredient != NULL) {
-
-        int cmp = strcmp(currentNode -> list -> head -> ingredient, currentIngredient -> ingredientName);
-        Batch* currentBatch = currentNode -> list -> head;
-        if(cmp == 0) {
-            lastBatch = NULL;
-            //se per preparare 1 torta mi servono 2 uova. per prepararne X mi servono 2*X uova
-            int quantityToFind = currentIngredient -> quantity * quantityOrder;
-            while(!ingredientFound && currentBatch != NULL) {
-
-                if(currentBatch -> expiration <= currentTime) {
-                    currentBatch -> quantityLeft = 0;
-                }
-                result = fixBatchWareHouse(currentBatch, lastBatch, currentNode, lastNode, wareHouseListofLists);
-                switch (result) {
-                    case 2:
-                        lastNode = NULL;
-                        currentNode = NULL;
-                        currentBatch = NULL;
-                        lastBatch = NULL;
-                        break;
-                    case 3:
-                        currentNode = lastNode;
-                        currentBatch = NULL;
-                        lastBatch = NULL;
-                        break;
-                    case 4:
-                        currentBatch = currentBatch -> next;
-                        break;
-                    case 5:
-                        free(currentNode);
-                        free(currentBatch);
-                        return checkIfIngredientIsPresentInModifiedWareHouse(wareHouseListofLists, order, currentTime, numberIngredientToFind, numberIngredientFound);
-                    case 6:
-                        currentBatch = currentBatch -> next;
-                        break;
-                    default:
-                        //return 0 oppure 1 (currentBatch ancora disponibile)
-                        currentBatch -> quantityLeft = currentBatch -> quantity;
-                        currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
-                        quantityToFind = quantityToFind - currentBatch -> quantity;
-                        if(quantityToFind <= 0)
-                            ingredientFound = true;
-
-                        lastBatch = currentBatch;
-                        currentBatch = currentBatch -> next;
-                        break;
-                }
-            }
-
-            if(ingredientFound){
-                //sommo i pesi degli ingredienti
-                numberIngredientFound++;
-                order -> weight = order -> weight + (currentIngredient -> quantity * quantityOrder);
-                currentIngredient = currentIngredient -> next;
-                if(currentIngredient != NULL)
-                    numberIngredientToFind++;
-                ingredientFound = false;
-            }else {
-                order -> weight = 0;
-                //orderPrepared = false;
-            }
-
-        }else{
-            lastBatch = NULL;
-            while(currentBatch != NULL) {
-                //cancello nodo scaduto in base alla casistica
-                if(currentBatch -> expiration <= currentTime)
-                    currentBatch -> quantityLeft = 0;
-                //chiamo metodo fix per cancellare il batch e eventualemnte il currentNode se rimane vuoto
-                result = fixBatchWareHouse(currentBatch, lastBatch, currentNode, lastNode, wareHouseListofLists);
-                switch (result) {
-                    case 2:
-                        lastNode = NULL;
-                        currentNode = NULL;
-                        currentBatch = NULL;
-                        lastBatch = NULL;
-                        break;
-                    case 3:
-                        currentNode = lastNode;
-                        currentBatch = NULL;
-                        lastBatch = NULL;
-                        break;
-                    case 4:
-                        currentBatch = currentBatch -> next;
-                        break;
-                    case 5:
-                        free(currentNode);
-                        free(currentBatch);
-                        return checkIfIngredientIsPresentInModifiedWareHouse(wareHouseListofLists, order, currentTime, numberIngredientToFind, numberIngredientFound);
-                    case 6:
-                        currentBatch = currentBatch -> next;
-                        break;
-                    default:
-                        //return 0 oppure 1
-                        //printf("error in fix");
-                        break;
-                }
-                lastBatch = currentBatch;
-                if(currentBatch != NULL)
-                    currentBatch = currentBatch -> next;
-            }
-        }
-        lastNode = currentNode;
-        if(currentNode != NULL) {
-            currentNode = currentNode -> next;
-        }
-    }
-    //in base a orderPrepared capisco se ho trovato tutti gli ingredienti oppure no
-    //prima di restituire true devo cancellare tutti i batch che utilizzo per preparare l'ordine
-    if(currentIngredient == NULL && numberIngredientFound == numberIngredientToFind) {
-        wareHouseListofLists -> modified = true;
-        return true;
-    }else {
-        wareHouseListofLists -> modified = false;
-        order -> weight = 0;
-        return false;
-    }
-}
-
-bool checkIfIngredientIsPresentInWareHouse(HashTable* wareHouseListofLists, Order* order, int currentTime) {
-
-    if(wareHouseListofLists -> modified == true) {
-        return checkIfIngredientIsPresentInModifiedWareHouse(wareHouseListofLists, order, currentTime, 1, 0);
-    }else {
-        return checkIfIngredientIsPresentInNotModifiedWareHouse(wareHouseListofLists, order, currentTime);
-    }
-}
-*/
 bool checkIfRecipeIsPresentInReadyQueue(Queue* readyQueue, char* recipeName) {
 
     Order* currentOrder = readyQueue -> head;
