@@ -309,7 +309,7 @@ void freeHashTable(HashTable* table){
 
     for (int i = 0; i < table -> size; i++) {
         if(table -> items[i] != NULL){
-            //freeBatch(table -> items[i] -> list);
+            freeBatch(table -> items[i] -> list);
             free(table -> items[i] -> ingredientKey);
         }
         free(table -> items[i]);
@@ -1125,8 +1125,6 @@ bool prepareSingleOrder(HashTable** table, Order* order, int currentTime) {
 }
 
 void removeNewline(char *str) {
-    if(str == NULL)
-        return;
 
     size_t len = strlen(str);
     if (len > 0 && str[len - 1] == '\n') {
@@ -1143,7 +1141,7 @@ void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* ready
         return;
     }
 
-    //removeNewline(recipeName);
+    removeNewline(recipeName);
 
     Recipe* currentRecipe = recipeList -> head;
     Recipe* last = NULL;
@@ -1287,7 +1285,7 @@ void UTILS_commandsHandler() {
     int capacity = 0;
     int currentTime = 0;
     Recipe* recipe = NULL;
-    size_t length;
+    //size_t length;
 
     RecipeList* recipeList = createRecipeList();
     HashTable* table = createHashTable();
@@ -1340,13 +1338,15 @@ void UTILS_commandsHandler() {
             break;
         case rimuovi_ricetta_HASH:
             commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
-            length = strlen(commandArgumentHolder);
-            recipeName = (char*)malloc(length * sizeof(char));     //lunghezza escludendo il penultimo carattere
-            strncpy(recipeName, commandArgumentHolder, length - 1);
+
+            recipeName = strndup(commandArgumentHolder, 257);
+
             //recipeName[length - 1] = '\0';
             //rimuovo ricetta da hash table
+
             removeRecipeFromList(recipeName, recipeList, readyQueue, waitQueue);
             free(recipeName);
+
             break;
         case rifornimento_HASH:
             while ((commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER)) != NULL) {
