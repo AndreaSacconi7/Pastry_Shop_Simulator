@@ -530,6 +530,76 @@ void appendToInternalList(HashTable** table,Batch** head, Batch* newBatch, int c
     }
 }
 
+//l'unica differenza tra forceInsertInHashTable e insertBatchInHashTable è che forceInsertInHashTable posiziona
+//il nuovo batch anche se la cella è stata cancellata ma l'ingredientKey è diverso. invece insertBatchInHashTable
+//non posiziona il nuovo batch se la cella è stata cancellata e l'ingredientKey è diverso perchè
+//altrimenti rischio di avere ingredienti dello stesso tipo in celle diverse
+void forceInsertInHashTable(HashTable** table, Batch* newBatch, int currentTime) {
+
+    Item* newItem = NULL;
+    char* ingredientKey = newBatch -> ingredient;
+
+    unsigned int index = hashFunction(ingredientKey, (*table)->size);
+    unsigned int step = hashFunction2(ingredientKey, (*table)->size);
+
+    for (int i = 0; i < (*table) -> size; i++) {
+        int tryIndex = (index + i * step) % (*table)->size;
+
+        if ((*table)->items[tryIndex] == NULL) {
+            newItem = createItem(ingredientKey);
+            newItem -> list = newBatch;
+            newBatch -> next = NULL;
+            (*table)->items[tryIndex] = newItem;
+            (*table)->count++;
+            return;
+        }
+
+        //controllo se la cella è stata cancellata e inserisco il batch nella cella in cima
+        if ((*table)->items[tryIndex]->isDeleted) {
+            //se la cella è stata cancellata devo inserire il nuovo batch nella cella in cima
+            //libero memoria occupata dal vecchio batch
+            //free((*table)->items[tryIndex]->list->ingredient);
+            freeBatch((*table)->items[tryIndex]->list);
+            (*table)->items[tryIndex]->list = newBatch;
+            (*table)->items[tryIndex]->isDeleted = false;
+            //libero memoria della vecchia stringa
+            free((*table)->items[tryIndex]->ingredientKey);
+            (*table)->items[tryIndex]->ingredientKey = strndup(ingredientKey, 257);
+            newBatch -> next = NULL;
+            (*table)->count++;
+            return;
+        }
+
+        //controllo se la key della cella è uguale a ingredientKey
+        if (strcmp((*table) -> items[tryIndex] -> ingredientKey, ingredientKey) == 0) {
+
+            //controllo se la cella è stata cancellata
+            if ((*table)->items[tryIndex]->isDeleted) {
+                //se la cella è stata cancellata devo inserire il nuovo batch nella cella in cima
+                //libero memoria occupata dal vecchio batch
+                //free((*table)->items[tryIndex]->list->ingredient);
+                freeBatch((*table)->items[tryIndex]->list);
+                (*table)->items[tryIndex]->list = newBatch;
+                (*table)->items[tryIndex]->isDeleted = false;
+                //libero memoria della vecchia stringa
+                free((*table)->items[tryIndex]->ingredientKey);
+                (*table)->items[tryIndex]->ingredientKey = strndup(ingredientKey, 257);
+                newBatch -> next = NULL;
+                (*table)->count++;
+                return;
+            }
+
+            //se la cella non è stata cancellata devo inserire il nuovo batch nella lista interna
+            Batch* headBatch = (*table) -> items[tryIndex] -> list;
+            //scorro la lista interna e inserisco il nuovo batch in ordine di expiration
+            appendToInternalList(table, &headBatch, newBatch, currentTime, tryIndex);
+            return;
+        }
+    }
+    resize(table, currentTime);
+    forceInsertInHashTable(table, newBatch, currentTime);
+}
+
 
 void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime) {
 
@@ -585,8 +655,7 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
             return;
         }
     }
-    //per debug
-    printf("-------------------------error in insert hash table");
+    forceInsertInHashTable(table, newBatch, currentTime);
 }
 
 void resize(HashTable** table, int currentTime) {
@@ -1363,7 +1432,7 @@ void UTILS_commandsHandler() {
         //arriva il furgone. lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
         selectOrderToPutInVan(capacity, readyQueue);
     }
-    printHashTable(table);
+    //printHashTable(table);
     //dealloco le strutture dati
     free(order);
     free(batch);
