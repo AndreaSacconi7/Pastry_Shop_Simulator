@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #define MAX_COMMAND_ARGUMENTS 500
 
@@ -16,7 +17,7 @@
 #define rifornimento_HASH 1308
 #define ordine_HASH 641
 
-#define INITIAL_TABLE_SIZE 50
+#define INITIAL_TABLE_SIZE 1000
 #define LOAD_FACTOR_THRESHOLD 0.7
 
 //ingrediente
@@ -105,11 +106,11 @@ unsigned int hashFunction(char* key, int tableSize) {
     //unsigned int key_len = strlen(key);
 
     while (key[i] != '\0') {
-        value = (value * 31 + key[i]) % tableSize;
+        value = (value * 31 + key[i]);
         i++;
     }
 
-    return value;
+    return value % tableSize;
 }
 
 unsigned int hashFunction2(char* key, int tableSize) {
@@ -118,11 +119,39 @@ unsigned int hashFunction2(char* key, int tableSize) {
     //unsigned int key_len = strlen(key);
 
     while (key[i] != '\0') {
-        value = (value * 37 + key[i]) % tableSize;
+        value = (value + key[i]);
         i++;
     }
 
-    return value;
+    return value * 37 % tableSize;
+}
+
+uint32_t hash(char* string){
+
+    uint32_t hash = 5381;
+    int c;
+    while((c = *string++)){
+        hash = hash * 31 + c;
+    }
+    return hash;
+}
+
+int hash_strcmp(char* s1, char* s2){
+
+    uint32_t hash1 = hash(s1);
+    uint32_t hash2 = hash(s2);
+    if(hash1 == hash2){
+        size_t len1 = strlen(s1);
+        size_t len2 = strlen(s2);
+        if(s1 != s2){
+            if(len1 < len2)
+                return -1;
+
+            return 1;
+        }
+        return 0;
+    }
+    return hash1 - hash2;
 }
 
 
@@ -909,12 +938,13 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
                 }else {
                     //aggiorno il valore di quantity a quantityLeft
                     currentBatch -> quantity = currentBatch -> quantityLeft;
-                    lastBatch = currentBatch;
-                    currentBatch = currentBatch -> next;
+                    //lastBatch = currentBatch;
+                    //currentBatch = currentBatch -> next;
+                    return;
                 }
             }else {
                 if(isModified) {
-                    break;
+                    return;
                 }else {
                     //in teoria non ci entro mai
                     lastBatch = currentBatch;
@@ -928,7 +958,7 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
                 lastBatch = currentBatch;
                 currentBatch = currentBatch -> next;
             }else {
-                break;
+                return;
             }
         }
     }
