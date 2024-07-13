@@ -792,7 +792,7 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
                     if(lastBatch == NULL && currentBatch -> next == NULL) {
                         //cancello testa della lista interna senza che ci siano altri elementi quindi pongo isDeleted a true
                         (*table) -> items[index] -> isDeleted = true;
-                        (*table) -> items[index] -> list -> next == NULL;
+                        //(*table) -> items[index] -> list -> next == NULL;
                         (*table) -> count--;
                         temp = NULL;
                         /*(*currentBatch) -> quantity = 0;
@@ -1056,6 +1056,9 @@ bool prepareSingleOrder(HashTable** table, Order* order, int currentTime) {
 }
 
 void removeNewline(char *str) {
+    if(str == NULL)
+        return;
+
     size_t len = strlen(str);
     if (len > 0 && str[len - 1] == '\n') {
         str[len - 1] = '\0';
@@ -1071,7 +1074,7 @@ void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* ready
         return;
     }
 
-    removeNewline(recipeName);
+    //removeNewline(recipeName);
 
     Recipe* currentRecipe = recipeList -> head;
     Recipe* last = NULL;
