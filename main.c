@@ -136,7 +136,7 @@ Node* createNodeIngredient(char* nameIngredient, int quantity) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
-    newNode -> ingredientName = strdup(nameIngredient);
+    newNode -> ingredientName = strndup(nameIngredient, 257);
     newNode -> quantity = quantity;
     newNode -> next = NULL;
     return newNode;
@@ -149,7 +149,7 @@ Recipe* createRecipe(char* nameRecipe) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
-    newRecipe -> name = strdup(nameRecipe);
+    newRecipe -> name = strndup(nameRecipe, 257);
     ingredientList -> head = NULL;
     newRecipe -> ingredientList = ingredientList;
 
@@ -175,7 +175,7 @@ Order* createOrder(char* recipeName, int quantity, int currentTime) {
         exit(1);
     }
     newOrder -> next = NULL;
-    newOrder -> recipeName = strdup(recipeName);
+    newOrder -> recipeName = strndup(recipeName, 257);
     newOrder -> quantity = quantity;
     newOrder -> weight = 0;
     newOrder -> time = currentTime;
@@ -202,7 +202,7 @@ Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
-    newBatch -> ingredient = strdup(ingredient);
+    newBatch -> ingredient = strndup(ingredient, 257);
     newBatch -> expiration = expiration;
     newBatch -> quantity = quantity;
     newBatch -> quantityLeft = quantity;
@@ -229,7 +229,7 @@ Item* createItem(char* key) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
-    item -> ingredientKey = strdup(key);
+    item -> ingredientKey = strndup(key, 257);
     item -> list = NULL;
     item -> isDeleted = false;
 
@@ -572,7 +572,7 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
                 (*table)->items[tryIndex]->isDeleted = false;
                 //libero memoria della vecchia stringa
                 free((*table)->items[tryIndex]->ingredientKey);
-                (*table)->items[tryIndex]->ingredientKey = strdup(ingredientKey);
+                (*table)->items[tryIndex]->ingredientKey = strndup(ingredientKey, 257);
                 newBatch -> next = NULL;
                 (*table)->count++;
                 return;
@@ -581,7 +581,7 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
             //se la cella non è stata cancellata devo inserire il nuovo batch nella lista interna
             Batch* headBatch = (*table) -> items[tryIndex] -> list;
             //scorro la lista interna e inserisco il nuovo batch in ordine di expiration
-            appendToInternalList(table, &headBatch, newBatch, currentTime, index);
+            appendToInternalList(table, &headBatch, newBatch, currentTime, tryIndex);
             return;
         }
     }
@@ -781,7 +781,7 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
         }*/
         if(isModified == true || currentBatch -> expiration <= currentTime) {
 
-            if(currentBatch -> quantityLeft < currentBatch -> quantity) {
+            if(currentBatch -> quantityLeft < currentBatch -> quantity || currentBatch -> expiration <= currentTime) {
                 if(currentBatch -> quantityLeft <= 0) {
                     currentBatch -> quantityLeft = -1;
                     currentBatch -> quantity = 0;
@@ -792,6 +792,7 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
                     if(lastBatch == NULL && currentBatch -> next == NULL) {
                         //cancello testa della lista interna senza che ci siano altri elementi quindi pongo isDeleted a true
                         (*table) -> items[index] -> isDeleted = true;
+                        (*table) -> items[index] -> list -> next == NULL;
                         (*table) -> count--;
                         temp = NULL;
                         /*(*currentBatch) -> quantity = 0;
@@ -843,14 +844,23 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
                     currentBatch = currentBatch -> next;
                 }
             }else {
-                lastBatch = currentBatch;
-                currentBatch = currentBatch -> next;
+                if(isModified) {
+                    break;
+                }else {
+                    //in teoria non ci entro mai
+                    lastBatch = currentBatch;
+                    currentBatch = currentBatch -> next;
+                }
             }
         }else {
-            //ripristino il valore di quantityLeft
-            currentBatch -> quantityLeft = currentBatch -> quantity;
-            lastBatch = currentBatch;
-            currentBatch = currentBatch -> next;
+            if(currentBatch -> quantityLeft < currentBatch -> quantity) {
+                //ripristino il valore di quantityLeft
+                currentBatch -> quantityLeft = currentBatch -> quantity;
+                lastBatch = currentBatch;
+                currentBatch = currentBatch -> next;
+            }else {
+                break;
+            }
         }
     }
 }
@@ -1050,6 +1060,8 @@ void removeNewline(char *str) {
     if (len > 0 && str[len - 1] == '\n') {
         str[len - 1] = '\0';
     }
+    //printf("%s\n", str);
+    //printf("%c, %c\n", str[len-1], str[len]);
 }
 
 void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* readyQueue, Queue* waitQueue) {
@@ -1203,6 +1215,7 @@ void UTILS_commandsHandler() {
     int capacity = 0;
     int currentTime = 0;
     Recipe* recipe = NULL;
+    size_t length;
 
     RecipeList* recipeList = createRecipeList();
     HashTable* table = createHashTable();
@@ -1237,7 +1250,7 @@ void UTILS_commandsHandler() {
                 recipe = createRecipe(recipeName);
                 while ((commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER)) != NULL) {
                     //commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
-                    ingredientName = strdup(commandArgumentHolder);
+                    ingredientName = strndup(commandArgumentHolder, 257);
                     commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
                     quantity = atoi(commandArgumentHolder);
                     //creo ingrediente
@@ -1255,18 +1268,26 @@ void UTILS_commandsHandler() {
             break;
         case rimuovi_ricetta_HASH:
             commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
-            recipeName = strdup(commandArgumentHolder);
+            length = strlen(commandArgumentHolder);
+            recipeName = (char*)malloc(length * sizeof(char));     //lunghezza escludendo il penultimo carattere
+            strncpy(recipeName, commandArgumentHolder, length - 1);
+            //recipeName[length - 1] = '\0';
             //rimuovo ricetta da hash table
             removeRecipeFromList(recipeName, recipeList, readyQueue, waitQueue);
             free(recipeName);
             break;
         case rifornimento_HASH:
             while ((commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER)) != NULL) {
-                ingredientName = strdup(commandArgumentHolder);
+                ingredientName = strndup(commandArgumentHolder, 257);
+                //if(commandArgumentHolder[length] == '\0')
+                 //   printf("---------COMMANDARGOMENT HA il terminatore VALE %c, %c\n", commandArgumentHolder[length-1], commandArgumentHolder[length]);
                 commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
                 quantity = atoi(commandArgumentHolder);
                 commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
                 expiration = atoi(commandArgumentHolder);
+                /*length = strlen(commandArgumentHolder);
+                if(commandArgumentHolder[length] == '\n' || commandArgumentHolder[length-1] == '\n')
+                    printf("---------COMMANDARGOMENT HA il slash a capo VALE %s\n", commandArgumentHolder);*/
                 //creo Batch
                 batch = createNodeBatch(ingredientName, expiration, quantity);
                 //inserisco Batch nel magazzino (hash table)
@@ -1285,7 +1306,20 @@ void UTILS_commandsHandler() {
             break;
         case ordine_HASH:
             commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
-            recipeName = strdup(commandArgumentHolder);
+            recipeName = strndup(commandArgumentHolder, 257);
+            /*
+            if(recipeName[length] == '\0') {
+                printf("---------RECIPENAME HA GIà il terminatore VALE %s\n", recipeName);
+            }else {
+                printf("---------RECIPENAME SENZA terminatore VALE %s\n", recipeName);
+            }
+            recipeName[length] = '\0';
+            if(recipeName[length] == '\0') {
+                printf("---------RECIPENAME CON TERMINATORE VALE %s\n", recipeName);
+            }else {
+                printf("---------RECIPENAME SENZA terminatore ancora VALE %s\n", recipeName);
+            }
+            */
             //controllo se esiste ricetta con questo nome. se esisto vado avanti, altrimenti esco dallo switch
             recipe = checkIfRecipeIsPresent(recipeName, recipeList);
             if(recipe != NULL) {
@@ -1326,7 +1360,7 @@ void UTILS_commandsHandler() {
         //arriva il furgone. lo riempo in base alla sua capacity prendendo gli ordini da readyQueue
         selectOrderToPutInVan(capacity, readyQueue);
     }
-    //printHashTable(table);
+    printHashTable(table);
     //dealloco le strutture dati
     free(order);
     free(batch);
