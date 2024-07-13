@@ -17,7 +17,7 @@
 #define rifornimento_HASH 1308
 #define ordine_HASH 641
 
-#define INITIAL_TABLE_SIZE 1000
+#define INITIAL_TABLE_SIZE 5000
 #define LOAD_FACTOR_THRESHOLD 0.7
 
 //ingrediente
@@ -141,15 +141,7 @@ int hash_strcmp(char* s1, char* s2){
     uint32_t hash1 = hash(s1);
     uint32_t hash2 = hash(s2);
     if(hash1 == hash2){
-        size_t len1 = strlen(s1);
-        size_t len2 = strlen(s2);
-        if(s1 != s2){
-            if(len1 < len2)
-                return -1;
-
-            return 1;
-        }
-        return 0;
+        return strcmp(s1, s2);
     }
     return hash1 - hash2;
 }
@@ -600,7 +592,7 @@ void forceInsertInHashTable(HashTable** table, Batch* newBatch, int currentTime)
         }
 
         //controllo se la key della cella è uguale a ingredientKey
-        if (strcmp((*table) -> items[tryIndex] -> ingredientKey, ingredientKey) == 0) {
+        if (hash_strcmp((*table) -> items[tryIndex] -> ingredientKey, ingredientKey) == 0) {
 
             //controllo se la cella è stata cancellata
             if ((*table)->items[tryIndex]->isDeleted) {
@@ -659,7 +651,7 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
         }
 
         //controllo se la key della cella è uguale a ingredientKey
-        if (strcmp((*table) -> items[tryIndex] -> ingredientKey, ingredientKey) == 0) {
+        if (hash_strcmp((*table) -> items[tryIndex] -> ingredientKey, ingredientKey) == 0) {
 
             //controllo se la cella è stata cancellata
             if ((*table)->items[tryIndex]->isDeleted) {
@@ -1091,7 +1083,7 @@ bool checkIfRecipeIsPresentInReadyQueue(Queue* readyQueue, char* recipeName) {
 
     Order* currentOrder = readyQueue -> head;
     while (currentOrder != NULL) {
-        if(strcmp(currentOrder -> recipeName, recipeName) == 0) {
+        if(hash_strcmp(currentOrder -> recipeName, recipeName) == 0) {
             //ricetta presente nella queue di ordini in attesa
             return true;
         }
