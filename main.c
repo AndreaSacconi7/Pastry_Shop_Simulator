@@ -112,13 +112,12 @@ void resizeRecipeHashTable(RecipeHashTable** table);
 //
 
 unsigned int hashFunction(char* key, int tableSize) {
-    unsigned long int value = 0;
-    unsigned int i = 0;
+    unsigned long int value = 5381;
+    int c;
     //unsigned int key_len = strlen(key);
 
-    while (key[i] != '\0') {
-        value = (value * 31 + key[i]);
-        i++;
+    while ((c = *key++)) {
+        value = (value * 33 + c);
     }
 
     return value % tableSize;
@@ -127,10 +126,11 @@ unsigned int hashFunction(char* key, int tableSize) {
 unsigned int hashFunction2(char* key, int tableSize) {
     unsigned long int value = 0;
     unsigned int i = 0;
+    int c;
     //unsigned int key_len = strlen(key);
 
-    while (key[i] != '\0') {
-        value = (value + key[i]);
+    while ((c = *key++)) {
+        value = (value + c);
         i++;
     }
 
