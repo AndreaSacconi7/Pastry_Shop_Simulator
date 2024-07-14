@@ -40,10 +40,6 @@ typedef struct Recipe {
     struct Recipe* next;
 } Recipe;
 
-typedef struct RecipeList {
-    Recipe* head;
-} RecipeList;
-
 //lista di lotti (magazzino)
 typedef struct RecipeHashTable {
     Recipe** items;            //lotto con scadenza più vicina (dove estraggo)
@@ -189,17 +185,6 @@ Recipe* createRecipe(char* nameRecipe) {
     return newRecipe;
 }
 
-RecipeList* createRecipeList() {
-    RecipeList* newRecipeList = (RecipeList*)malloc(sizeof(RecipeList));
-    if(newRecipeList == NULL) {
-        printf("Errore di allocazione della memoria\n");
-        exit(1);
-    }
-    newRecipeList -> head = NULL;
-
-    return newRecipeList;
-}
-
 RecipeHashTable* createRecipeHashTable() {
     RecipeHashTable* newHashTable = (RecipeHashTable*)malloc(sizeof(RecipeHashTable));
     if (newHashTable == NULL) {
@@ -301,6 +286,10 @@ HashTable* createHashTable() {
     }
     return newHashTable;
 }
+
+//
+//funzioni free
+//
 
 void freeIngredientList(List* list){
 
@@ -907,28 +896,6 @@ Recipe* checkIfRecipeIsPresentInHashTable(char* ingredientKey, RecipeHashTable**
             }
             //ricetta già presente nella hashTable
             return (*table) -> items[tryIndex];
-        }
-    }
-    return NULL;
-}
-
-
-Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
-
-    Recipe* temp = list -> head;
-
-    while (temp != NULL) {
-        int cmp = strcmp(temp -> name , recipe);
-        if(cmp < 0) {
-            temp = temp -> next;
-
-        }else if(cmp == 0){
-            //ricetta già presente nella lista
-            return temp;
-
-        }else {
-            //ho superato l'ordine alfabetico di recipe. quindi non esiste la ricetta recipe
-            return NULL;
         }
     }
     return NULL;
