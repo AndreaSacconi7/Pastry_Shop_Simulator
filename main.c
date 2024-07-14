@@ -125,13 +125,13 @@ unsigned int hashFunction(char* key, int tableSize) {
 
 unsigned int hashFunction2(char* key, int tableSize) {
     unsigned long int value = 0;
-    unsigned int i = 0;
+    //unsigned int i = 0;
     int c;
     //unsigned int key_len = strlen(key);
 
     while ((c = *key++)) {
         value = (value + c);
-        i++;
+        //i++;
     }
 
     return value * 37 % tableSize;
@@ -142,7 +142,7 @@ uint32_t hash(char* string){
     uint32_t hash = 5381;
     int c;
     while((c = *string++)){
-        hash = hash * 31 + c;
+        hash = hash + c;
     }
     return hash;
 }
