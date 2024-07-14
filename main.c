@@ -314,20 +314,6 @@ void freeIngredientList(List* list){
     }
 }
 
-void freeRecipeInList(RecipeList* list){
-
-    Recipe* currentRecipe = list -> head;
-    Recipe* temp;
-    while(currentRecipe != NULL){
-        temp = currentRecipe -> next;
-        freeIngredientList(currentRecipe -> ingredientList);
-        free(currentRecipe -> ingredientList);
-        free(currentRecipe -> name);
-        free(currentRecipe);
-        currentRecipe = temp;
-    }
-}
-
 void freeRecipeInHashTable(RecipeHashTable* table){
 
     for (int i = 0; i < table -> size; i++) {
@@ -426,48 +412,6 @@ void appendIngredientToRecipe(Node* newNode, List* list){
         //inserimento in coda con solo un elemento in lista
         list -> head -> next = newNode;
         newNode -> next = NULL;
-    }
-}
-
-void appendRecipeToList(Recipe* newRecipe, RecipeList* list) {
-
-    if(list -> head == NULL) {
-        list -> head = newRecipe;
-        newRecipe -> next = NULL;
-    }
-
-    Recipe* temp = list -> head;
-    Recipe* last = NULL;
-
-    while(temp != NULL) {
-        int cmp = strcmp(temp -> name , newRecipe -> name);
-        if(cmp < 0) {
-            last = temp;
-            temp = temp -> next;
-
-        }else if(cmp == 0){
-            //ricetta già presente nella lista
-            return;
-
-        }else {
-            //posiziono il newNode prima del nodo temp
-            if(last != NULL) {
-                //inserisco prima di temp e dopo last
-                last -> next = newRecipe;
-                newRecipe -> next = temp;
-            }else {
-                //inserisco in testa
-                newRecipe -> next = list -> head;
-                list -> head = newRecipe;
-            }
-            return;
-        }
-    }
-    //inserimento in coda
-    if(last != NULL) {
-        //inserimento in coda con X elementi in lista
-        last -> next = newRecipe;
-        newRecipe -> next = NULL;
     }
 }
 
@@ -588,89 +532,6 @@ void insertRecipeInHashTable(RecipeHashTable** table, Recipe* newRecipe) {
     }
     forceInsertRecipeInHashTable(table, newRecipe);
 }
-
-/*
-void fixSuccesorBatch(Batch* currentBatch, bool modified) {
-
-    while(currentBatch != NULL) {
-
-        if(currentBatch -> quantityLeft < currentBatch -> quantity) {
-            if(modified)
-                currentBatch -> quantity = currentBatch -> quantityLeft;
-            else
-                currentBatch -> quantityLeft = currentBatch -> quantity;
-        }
-        currentBatch = currentBatch -> next;
-    }
-}
-*/
-/*
-//la internal list viene ordinata in ordine di expiration
-//scadenza più vicina -> scadenza più lontana
-void appendToInternalList(InternalList* list, Batch* newNode, bool modified) {
-
-    if (list -> head == NULL) {
-        list -> head = newNode;
-        newNode -> next = NULL;
-        return;
-    }
-
-    Batch* currentBatch = list -> head;
-    Batch* last = NULL;
-
-    while(currentBatch != NULL) {
-
-        if(currentBatch -> expiration <= newNode -> expiration) {
-            last = currentBatch;
-            currentBatch = currentBatch -> next;
-        }else {
-            if(last == NULL) {
-                newNode -> next = list -> head;
-                list -> head = newNode;
-            }else {
-                last -> next = newNode;
-                newNode -> next = currentBatch;
-            }
-            //aggiusto i successivi batch compreso il currentBatch poichè viene posto dopo newNode
-            fixSuccesorBatch(currentBatch, modified);
-            return;
-        }
-    }
-    //inserimento in coda dopo aver scorso tutta la lista
-    if(last == NULL) {
-        //inserimento in coda con un solo elemento (non dovrebbe succedere)
-        list -> head -> next = newNode;
-        newNode -> next = NULL;
-    }else {
-        last -> next = newNode;
-        newNode -> next = NULL;
-    }
-}
-*/
-
-/*
-void appendToListOfLists(Item* lastNode, InternalList* newInternalList, HashTable* listOfLists) {
-    Item* newListNode = (Item*)malloc(sizeof(Item));
-    if (newListNode == NULL) {
-        printf("Errore di allocazione della memoria\n");
-        exit(1);
-    }
-    newListNode->list = newInternalList;
-    newListNode->next = NULL;
-
-    if(lastNode != NULL) {
-        //inserisco in mezzo o in coda
-        Item* nextNode = lastNode -> next;
-        lastNode -> next = newListNode;
-        newListNode -> next = nextNode;
-    }else {
-        //inserisco in testa
-        Item* oldHead = listOfLists -> head;
-        listOfLists -> head = newListNode;
-        newListNode -> next = oldHead;
-    }
-}
-*/
 
 void appendToInternalList(HashTable** table,Batch** head, Batch* newBatch, int currentTime, int index) {
 
@@ -1426,56 +1287,6 @@ void removeRecipeFromHashTable(RecipeHashTable** table, char* recipeName, Queue*
             return;
         }
     }
-    printf("non presente\n");
-}
-
-void removeRecipeFromList(char* recipeName, RecipeList* recipeList, Queue* readyQueue, Queue* waitQueue) {
-
-    if(recipeList -> head == NULL) {
-        printf("non presente\n");
-        return;
-    }
-
-    removeNewline(recipeName);
-
-    Recipe* currentRecipe = recipeList -> head;
-    Recipe* last = NULL;
-
-    while (currentRecipe != NULL) {
-        int cmp = strcmp(currentRecipe -> name , recipeName);
-        if(cmp < 0) {
-            last = currentRecipe;
-            currentRecipe = currentRecipe -> next;
-
-        }else if(cmp == 0){
-            //ricetta già presente nella lista
-            //controllo se ci sono ordini in sospeso relativi a questa ricetta.
-            //se si stampo in sospeso e non faccio nulla altrimenti rimossa e la rimuovo
-            if(!checkIfRecipeIsPresentInReadyQueue(readyQueue, recipeName) && !checkIfRecipeIsPresentInReadyQueue(waitQueue, recipeName)) {
-                //la ricetta non è presente in waitQueue quindi posso rimuoverla
-                printf("rimossa\n");
-                //aggiusto la lista e poi cancello la ricetta
-                if(last != NULL) {
-                    last -> next = currentRecipe -> next;
-                }else {
-                    recipeList -> head = currentRecipe -> next;
-                }
-                freeIngredientList(currentRecipe -> ingredientList);
-                free(currentRecipe -> ingredientList);
-                free(currentRecipe -> name);
-                free(currentRecipe);
-            }else {
-                printf("ordini in sospeso\n");
-            }
-            return;
-
-        }else {
-            //ho superato l'ordine alfabetico di recipeName. quindi non è presente nella lista
-            printf("non presente\n");
-            return;
-        }
-    }
-
     printf("non presente\n");
 }
 
