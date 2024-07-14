@@ -476,10 +476,10 @@ void forceInsertRecipeInHashTable(RecipeHashTable** table, Recipe* newBatch) {
     char* ingredientKey = newBatch -> name;
 
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
-    unsigned int step = hashFunction2(ingredientKey, (*table)->size);
+    //unsigned int step = hashFunction2(ingredientKey, (*table)->size);
 
     for (int i = 0; i < (*table) -> size; i++) {
-        int tryIndex = (index + i * step) % (*table)->size;
+        int tryIndex = (index + i) % (*table)->size;
 
         if ((*table)->items[tryIndex] == NULL) {
             //newItem = createItem(ingredientKey);
@@ -547,10 +547,10 @@ void insertRecipeInHashTable(RecipeHashTable** table, Recipe* newRecipe) {
     char* ingredientKey = newRecipe -> name;
 
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
-    unsigned int step = hashFunction2(ingredientKey, (*table)->size);
+    //unsigned int step = hashFunction2(ingredientKey, (*table)->size);
 
     for (int i = 0; i < (*table) -> size; i++) {
-        int tryIndex = (index + i * step) % (*table)->size;
+        int tryIndex = (index + i) % (*table)->size;
 
         if ((*table)->items[tryIndex] == NULL) {
             //newItem = createItem(ingredientKey);
@@ -720,10 +720,10 @@ void forceInsertInHashTable(HashTable** table, Batch* newBatch, int currentTime)
     char* ingredientKey = newBatch -> ingredient;
 
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
-    unsigned int step = hashFunction2(ingredientKey, (*table)->size);
+    //unsigned int step = hashFunction2(ingredientKey, (*table)->size);
 
     for (int i = 0; i < (*table) -> size; i++) {
-        int tryIndex = (index + i * step) % (*table)->size;
+        int tryIndex = (index + i) % (*table)->size;
 
         if ((*table)->items[tryIndex] == NULL) {
             newItem = createItem(ingredientKey);
@@ -795,10 +795,10 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
     char* ingredientKey = newBatch -> ingredient;
 
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
-    unsigned int step = hashFunction2(ingredientKey, (*table)->size);
+    //unsigned int step = hashFunction2(ingredientKey, (*table)->size);
 
     for (int i = 0; i < (*table) -> size; i++) {
-        int tryIndex = (index + i * step) % (*table)->size;
+        int tryIndex = (index + i) % (*table)->size;
 
         if ((*table)->items[tryIndex] == NULL) {
             newItem = createItem(ingredientKey);
@@ -1028,10 +1028,10 @@ void removeOrderInQueue(Queue* queue) {
 Recipe* checkIfRecipeIsPresentInHashTable(char* ingredientKey, RecipeHashTable** table) {
 
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
-    unsigned int step = hashFunction2(ingredientKey, (*table)->size);
+    //unsigned int step = hashFunction2(ingredientKey, (*table)->size);
 
     for (int i = 0; i < (*table) -> size; i++) {
-        int tryIndex = (index + i * step) % (*table)->size;
+        int tryIndex = (index + i) % (*table)->size;
 
         if ((*table)->items[tryIndex] == NULL) {
             return NULL;
@@ -1195,13 +1195,13 @@ void fixHashTable(HashTable** table, ModifiedIndex* modifiedIndexHead, int curre
 int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int currentTime, int quantityToFind, bool* isFound) {
 
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
-    unsigned int step = hashFunction2(ingredientKey, (*table)->size);
+    //unsigned int step = hashFunction2(ingredientKey, (*table)->size);
     Batch* currentBatch = NULL;
     //Batch* lastBatch = NULL;
     int indexModified = -1;
 
     for (int i = 0; i < (*table)->size; i++) {
-        int tryIndex = (index + i * step) % (*table)->size;
+        int tryIndex = (index + i) % (*table)->size;
 
         if ((*table)->items[tryIndex] == NULL) {
             *isFound = false;
@@ -1390,10 +1390,10 @@ void removeRecipeFromHashTable(RecipeHashTable** table, char* recipeName, Queue*
     removeNewline(recipeName);
 
     unsigned int index = hashFunction(recipeName, (*table)->size);
-    unsigned int step = hashFunction2(recipeName, (*table)->size);
+    //unsigned int step = hashFunction2(recipeName, (*table)->size);
 
     for (int i = 0; i < (*table) -> size; i++) {
-        int tryIndex = (index + i * step) % (*table)->size;
+        int tryIndex = (index + i) % (*table)->size;
 
         if ((*table)->items[tryIndex] == NULL) {
             printf("non presente\n");
