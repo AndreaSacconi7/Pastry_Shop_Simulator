@@ -57,6 +57,7 @@ typedef struct Batch {
     int expiration;
     int quantity;
     int quantityLeft;
+    int lastTimeModified;
     struct Batch* next;
 } Batch;
 
@@ -255,6 +256,7 @@ Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
     newBatch -> quantity = quantity;
     newBatch -> quantityLeft = quantity;
     newBatch -> next = NULL;
+    newBatch -> lastTimeModified = -1;
 
     return newBatch;
 }
@@ -1071,6 +1073,8 @@ Recipe* checkIfRecipeIsPresent(char* recipe, RecipeList* list) {
     return NULL;
 }
 
+int lastTimeModified = 0;
+
 void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int currentTime) {
 
     Batch* lastBatch = NULL;
@@ -1082,7 +1086,7 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
         /*if(currentBatch -> expiration <= currentTime) {
             currentBatch -> quantityLeft = -1;
         }*/
-        if(isModified == true || currentBatch -> expiration <= currentTime) {
+        if((currentBatch -> lastTimeModified == lastTimeModified && isModified == true) || currentBatch -> expiration <= currentTime) {
 
             if(currentBatch -> quantityLeft < currentBatch -> quantity || currentBatch -> expiration <= currentTime) {
                 if(currentBatch -> quantityLeft <= 0) {
@@ -1209,11 +1213,13 @@ int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int curr
             //scorro la lista interna e cerco la quantità di ingrediente richiesta
             while(currentBatch != NULL) {
                 if(currentBatch -> expiration > currentTime) {
+                    currentBatch -> quantityLeft = currentBatch -> quantity;
                     //sistemo quantityLeft in caso fosse stato modificato in precedenza senza che poi siano stati effetivamente usati gli ingredienti
                     if(currentBatch -> quantity > 0 && currentBatch -> quantityLeft > 0) {
                         indexModified = tryIndex;
                         currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
                         quantityToFind = quantityToFind - currentBatch -> quantity;
+                        currentBatch -> lastTimeModified = lastTimeModified;
                         if(quantityToFind <= 0) {
                             *isFound = true;
                             return tryIndex;
@@ -1225,6 +1231,7 @@ int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int curr
                 }else {
                     currentBatch -> quantity = 0;
                     currentBatch -> quantityLeft = -1;
+                    currentBatch -> lastTimeModified = lastTimeModified;
                     indexModified = tryIndex;
                     //lastBatch = currentBatch;
                     currentBatch = currentBatch -> next;
@@ -1255,15 +1262,17 @@ bool searchIngredient(HashTable** table, Order* order, int currentTime) {
     ModifiedIndex* modifiedIndexHead = NULL;
     bool isFound = true;
 
-    if((*table) -> items == NULL)
+    if((*table) -> items == NULL) {
+        lastTimeModified++;
         return false;
+    }
 
     while(currentIngredient != NULL) {
 
         index = searchIngredientInHashTable(table, currentIngredient -> ingredientName, currentTime, currentIngredient -> quantity * quantityOrder, &isFound);
         if(!isFound) {
             //inserisco ultimo index modificato in testa alla lista di chiavi hash se è != -1
-            if(index != -1) {
+            /*if(index != -1) {
                 //creo nodo della lista di chiavi hash
                 ModifiedIndex* modifiedIndex = createModifiedIndex(index);
                 //inserisco in testa il nuovo index
@@ -1271,8 +1280,14 @@ bool searchIngredient(HashTable** table, Order* order, int currentTime) {
                 modifiedIndexHead = modifiedIndex;
             }
             //sistemo la lista di ingredienti prima di fare return
-            fixHashTable(table, modifiedIndexHead, currentTime, false);
+            fixHashTable(table, modifiedIndexHead, currentTime, false);*/
+            while(modifiedIndexHead != NULL) {
+                ModifiedIndex* temp = modifiedIndexHead -> next;
+                free(modifiedIndexHead);
+                modifiedIndexHead = temp;
+            }
             order -> weight = 0;
+            lastTimeModified++;
             return false;
         }else {
             order -> weight = order -> weight + (currentIngredient -> quantity * quantityOrder);
@@ -1289,6 +1304,7 @@ bool searchIngredient(HashTable** table, Order* order, int currentTime) {
     //isFound = true;
     //sistemo la lista di ingredienti prima di fare return
     fixHashTable(table, modifiedIndexHead, currentTime, true);
+    lastTimeModified++;
     return true;
 }
 
