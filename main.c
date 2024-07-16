@@ -1001,22 +1001,27 @@ void removeBatchFromHashTable(HashTable** table, int index, bool isModified, int
     }
 }
 
-void fixHashTable(HashTable** table, ModifiedIndex* modifiedIndexHead, int currentTime, bool isModified) {
+int mioArray[50];
+int i;
 
-    ModifiedIndex* currentIndex = modifiedIndexHead;
-    ModifiedIndex* temp;
+void fixHashTable(HashTable** table, int currentTime, bool isModified) {
+
+    //ModifiedIndex* currentIndex = modifiedIndexHead;
+    //ModifiedIndex* temp;
+    int j = 0;
     //Batch* currentBatch = NULL;
     //Batch* lastBatch = NULL;
     //Batch* nextBatch = NULL;
-    while(currentIndex != NULL) {
+    while(j < i) {
         //lastBatch = NULL;
         //currentBatch = (*table) -> items[currentIndex -> index] -> list;
 
-        removeBatchFromHashTable(table, currentIndex -> index, isModified, currentTime);
+        removeBatchFromHashTable(table, mioArray[j], isModified, currentTime);
 
-        temp = currentIndex -> next;
-        free(currentIndex);
-        currentIndex = temp;
+        j++;
+        //temp = currentIndex -> next;
+        //free(currentIndex);
+        //currentIndex = temp;
     }
 }
 
@@ -1081,14 +1086,14 @@ int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int curr
     return -1;
 }
 
-
 bool searchIngredient(HashTable** table, Order* order, int currentTime) {
 
     Node* currentIngredient = order -> ingredientList -> head;
     int index;
     int quantityOrder = order -> quantity;
-    ModifiedIndex* modifiedIndexHead = NULL;
+    //ModifiedIndex* modifiedIndexHead = NULL;
     bool isFound = true;
+    i = 0;
 
     if((*table) -> items == NULL) {
         lastTimeModified++;
@@ -1109,11 +1114,11 @@ bool searchIngredient(HashTable** table, Order* order, int currentTime) {
             }
             //sistemo la lista di ingredienti prima di fare return
             fixHashTable(table, modifiedIndexHead, currentTime, false);*/
-            while(modifiedIndexHead != NULL) {
+            /*while(modifiedIndexHead != NULL) {
                 ModifiedIndex* temp = modifiedIndexHead -> next;
                 free(modifiedIndexHead);
                 modifiedIndexHead = temp;
-            }
+            }*/
             order -> weight = 0;
             lastTimeModified++;
             return false;
@@ -1121,17 +1126,19 @@ bool searchIngredient(HashTable** table, Order* order, int currentTime) {
             order -> weight = order -> weight + (currentIngredient -> quantity * quantityOrder);
             //salvo chiavi hash per poi poterle usare per rimuovere gli ingredienti
             //creo nodo della lista di chiavi hash
-            ModifiedIndex* modifiedIndex = createModifiedIndex(index);
+            //ModifiedIndex* modifiedIndex = createModifiedIndex(index);
             //inserisco in testa il nuovo index
-            modifiedIndex -> next = modifiedIndexHead;
-            modifiedIndexHead = modifiedIndex;
+            //modifiedIndex -> next = modifiedIndexHead;
+            //modifiedIndexHead = modifiedIndex;
+            mioArray[i] = index;
+            i++;
             currentIngredient = currentIngredient -> next;
         }
     }
     //pongo isModified a true così che poi posso sistemare gli ingredienti
     //isFound = true;
     //sistemo la lista di ingredienti prima di fare return
-    fixHashTable(table, modifiedIndexHead, currentTime, true);
+    fixHashTable(table, currentTime, true);
     lastTimeModified++;
     return true;
 }
