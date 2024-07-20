@@ -113,7 +113,7 @@ unsigned int hashFunction(char* key, int tableSize) {
     //unsigned int key_len = strlen(key);
 
     while ((c = *key++)) {
-        value = (value * 33 + c);
+        value = (value + c);
     }
 
     return value % tableSize;
@@ -1048,16 +1048,16 @@ int searchIngredientInHashTable(HashTable** table, char* ingredientKey, int curr
                 if(currentBatch -> expiration > currentTime) {
                     currentBatch -> quantityLeft = currentBatch -> quantity;
                     //sistemo quantityLeft in caso fosse stato modificato in precedenza senza che poi siano stati effetivamente usati gli ingredienti
-                    if(currentBatch -> quantity > 0 && currentBatch -> quantityLeft > 0) {
-                        indexModified = tryIndex;
-                        currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
-                        quantityToFind = quantityToFind - currentBatch -> quantity;
-                        currentBatch -> lastTimeModified = lastTimeModified;
-                        if(quantityToFind <= 0) {
-                            *isFound = true;
-                            return tryIndex;
-                        }
+                    //if(currentBatch -> quantity > 0 && currentBatch -> quantityLeft > 0) {
+                    indexModified = tryIndex;
+                    currentBatch -> quantityLeft = currentBatch -> quantity - quantityToFind;
+                    quantityToFind = quantityToFind - currentBatch -> quantity;
+                    currentBatch -> lastTimeModified = lastTimeModified;
+                    if(quantityToFind <= 0) {
+                        *isFound = true;
+                        return tryIndex;
                     }
+                    //}
 
                     //lastBatch = currentBatch;
                     currentBatch = currentBatch -> next;
