@@ -656,6 +656,8 @@ void insertItemInHashTable(HashTable** table, int currentTime, Node* ingredientN
     }
 }
 
+int periodicity = 0;
+int lastTimeRifornimento = 0;
 
 void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime, char* ingredientKey) {
 
@@ -1222,12 +1224,14 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, HashTable** listOfLists, 
     Order* next = NULL;
     int result;
     bool flag = true;
+    int condition = currentTime - periodicity;
 
     while (currentOrder != NULL) {
         //itero sugli ingredienti e controllo con checkIfIngredientIsPresentInWarehouse se sono tutti presenti
         //se sono tutti presenti sposto l'ordine in readyQueue e rimuovo gli ingredienti dal magazzino
         flag = true;
-        if(last != NULL) {
+
+        if(last != NULL || lastTimeRifornimento <= condition) {
             if(currentOrder -> recipe -> state == -1 && currentOrder -> recipe -> lastTimeUpdated == currentTime) {
                 last = currentOrder;
                 currentOrder = currentOrder -> next;
@@ -1238,6 +1242,7 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, HashTable** listOfLists, 
                 flag = false;
             }
         }
+
 
         if(!flag) {
             continue;
@@ -1453,7 +1458,6 @@ void UTILS_commandsHandler() {
     int tmp;
     Order* order = NULL;
     Batch* batch = NULL;
-    int periodicity = 0;
     int capacity = 0;
     int currentTime = 0;
     Recipe* recipe = NULL;
@@ -1548,6 +1552,7 @@ void UTILS_commandsHandler() {
             //controllo se gli ordini in attesa possono essere preparati
             prepareOrder(waitQueue, readyQueue, &table, currentTime);
             printf("rifornito\n");
+            lastTimeRifornimento = currentTime;
             break;
         case ordine_HASH:
             commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
@@ -1616,32 +1621,3 @@ int main(void) {
 
     return 0;
 }
-
-/*
-         if(ingredientFound){
-             ingredientFound = false;
-             Batch* headBatchList = currentNode -> list -> head;
-             Batch* temp = NULL;
-             //ciclo fino alla fine dei lotti o fino a che i lotti sono scaduti
-             while (headBatchList != NULL && headBatchList -> expiration > currentTime) {
-                 if(headBatchList == currentBatch)
-                     break;
-                 temp = headBatchList;
-                 headBatchList = temp -> next;
-                 free(temp);
-             }
-             if(quantityBatchLeft == 0) {
-                 //ultimo lotto svuotato. lo elimino
-                 temp = currentBatch;
-                 currentBatch = currentBatch -> next;
-                 currentNode -> list -> head = currentBatch;
-                 free(temp);
-             }else {
-                 //ultimo lotto va diminuita solo la quantitò
-                 currentBatch -> quantity = quantityBatchLeft;
-                 currentNode -> list -> head = currentBatch;
-             }
-
-         }else
-             return 1;
-         */
