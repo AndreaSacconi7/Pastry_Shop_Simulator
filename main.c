@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define MAX_COMMAND_ARGUMENTS 500
+#define MAX_COMMAND_ARGUMENTS 100
 
 #define MAX_COMMAND_ARGUMENT_LENGTH 255
 
@@ -51,18 +51,12 @@ typedef struct RecipeHashTable {
 
 //lotto (nodo, cella hash table)
 typedef struct Batch {
-    char* ingredient;
     int expiration;
     int quantity;
     int quantityLeft;
     int lastTimeModified;
     struct Batch* next;
 } Batch;
-
-typedef struct ModifiedIndex {
-    int index;
-    struct ModifiedIndex* next;
-} ModifiedIndex;
 
 // Struttura per il nodo della lista esterna
 typedef struct Item {
@@ -231,14 +225,13 @@ Queue* createQueue() {
     return newQueue;
 }
 
-Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
+Batch* createNodeBatch(int expiration, int quantity) {
 
     Batch* newBatch = (Batch*)malloc(sizeof(Batch));
     if(newBatch == NULL) {
         printf("Errore di allocazione della memoria\n");
         exit(1);
     }
-    newBatch -> ingredient = strndup(ingredient, 257);
     newBatch -> expiration = expiration;
     newBatch -> quantity = quantity;
     newBatch -> quantityLeft = quantity;
@@ -246,18 +239,6 @@ Batch* createNodeBatch(char *ingredient, int expiration, int quantity) {
     newBatch -> lastTimeModified = -1;
 
     return newBatch;
-}
-
-ModifiedIndex* createModifiedIndex(int index) {
-    ModifiedIndex* newIndex = (ModifiedIndex*)malloc(sizeof(ModifiedIndex));
-    if(newIndex == NULL) {
-        printf("Errore di allocazione della memoria\n");
-        exit(1);
-    }
-    newIndex -> index = index;
-    newIndex -> next = NULL;
-
-    return newIndex;
 }
 
 Item* createItem(char* key) {
@@ -337,8 +318,8 @@ void freeBatch(Batch* head){
     Batch* temp;
     while(currentBatch != NULL){
         temp = currentBatch -> next;
-        if(currentBatch -> ingredient != NULL)
-            free(currentBatch -> ingredient);
+        //if(currentBatch -> ingredient != NULL)
+         //   free(currentBatch -> ingredient);
         free(currentBatch);
         currentBatch = temp;
     }
@@ -524,7 +505,7 @@ void insertRecipeInHashTable(RecipeHashTable** table, Recipe* newRecipe) {
     forceInsertRecipeInHashTable(table, newRecipe);
 }
 
-void appendToInternalList(HashTable** table,Batch** head, Batch* newBatch, int currentTime, int index) {
+void appendToInternalList(HashTable** table, Batch** head, Batch* newBatch, int currentTime, int index) {
 
     if (*head == NULL) {
         *head = newBatch;
@@ -566,10 +547,9 @@ void appendToInternalList(HashTable** table,Batch** head, Batch* newBatch, int c
 //il nuovo batch anche se la cella è stata cancellata ma l'ingredientKey è diverso. invece insertBatchInHashTable
 //non posiziona il nuovo batch se la cella è stata cancellata e l'ingredientKey è diverso perchè
 //altrimenti rischio di avere ingredienti dello stesso tipo in celle diverse
-void forceInsertInHashTable(HashTable** table, Batch* newBatch, int currentTime) {
+void forceInsertInHashTable(HashTable** table, Batch* newBatch, int currentTime, char* ingredientKey) {
 
     Item* newItem = NULL;
-    char* ingredientKey = newBatch -> ingredient;
 
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
     //unsigned int step = hashFunction2(ingredientKey, (*table)->size);
@@ -629,11 +609,11 @@ void forceInsertInHashTable(HashTable** table, Batch* newBatch, int currentTime)
         }
     }
     resize(table, currentTime);
-    forceInsertInHashTable(table, newBatch, currentTime);
+    forceInsertInHashTable(table, newBatch, currentTime, ingredientKey);
 }
 
 
-void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime) {
+void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime, char* ingredientKey) {
 
     //se il batch è scaduto non lo inserisco
     if(newBatch -> expiration <= currentTime)
@@ -644,7 +624,7 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
         resize(table, currentTime);
     }
     Item* newItem = NULL;
-    char* ingredientKey = newBatch -> ingredient;
+    //char* ingredientKey = newBatch -> ingredient;
 
     unsigned int index = hashFunction(ingredientKey, (*table)->size);
     //unsigned int step = hashFunction2(ingredientKey, (*table)->size);
@@ -687,7 +667,7 @@ void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime)
             return;
         }
     }
-    forceInsertInHashTable(table, newBatch, currentTime);
+    forceInsertInHashTable(table, newBatch, currentTime, ingredientKey);
 }
 
 void resize(HashTable** table, int currentTime) {
@@ -719,7 +699,7 @@ void resize(HashTable** table, int currentTime) {
                 temp = batch -> next;
                 batch -> next = NULL;
                 //newBatch = createNodeBatch(batch -> ingredient, batch -> expiration, batch -> quantity);
-                insertBatchInHashTable(table, batch, currentTime);
+                insertBatchInHashTable(table, batch, currentTime, item -> ingredientKey);
                 batch = temp;
             }
         }
@@ -943,8 +923,8 @@ void removeBatchFromHashTable(HashTable** table, int index, int currentTime) {
                 }else if(lastBatch == NULL) {
                     //cancello testa della lista iterna ma ci sono altri elementi nella lista interna quindi sposto solo la testa
                     temp = currentBatch -> next;
-                    if(currentBatch -> ingredient != NULL)
-                        free(currentBatch -> ingredient);
+                    //if(currentBatch -> ingredient != NULL)
+                    //    free(currentBatch -> ingredient);
                     free(currentBatch);
                     (*table) -> items[index] -> list = temp;
                     //Batch** temp = currentBatch;
@@ -960,8 +940,8 @@ void removeBatchFromHashTable(HashTable** table, int index, int currentTime) {
                     //Batch* temp = *currentBatch;
                     lastBatch -> next = currentBatch -> next;
                     temp = currentBatch -> next;
-                    if(currentBatch -> ingredient != NULL)
-                        free(currentBatch -> ingredient);
+                    //if(currentBatch -> ingredient != NULL)
+                     //   free(currentBatch -> ingredient);
                     free(currentBatch);
                     //*lastBatch = *currentBatch;
                     //free(*currentBatch);
@@ -1366,7 +1346,7 @@ void printHashTable(HashTable* table) {
             }
             printf("\n");
             while(currentBatch != NULL) {
-                printf("ingredient: %s, expiration: %d, quantity: %d, quantityLeft: %d\n", currentBatch -> ingredient, currentBatch -> expiration, currentBatch -> quantity, currentBatch -> quantityLeft);
+                printf("expiration: %d, quantity: %d, quantityLeft: %d\n", currentBatch -> expiration, currentBatch -> quantity, currentBatch -> quantityLeft);
                 currentBatch = currentBatch -> next;
             }
         }
@@ -1472,9 +1452,9 @@ void UTILS_commandsHandler() {
                 if(commandArgumentHolder[length] == '\n' || commandArgumentHolder[length-1] == '\n')
                     printf("---------COMMANDARGOMENT HA il slash a capo VALE %s\n", commandArgumentHolder);*/
                 //creo Batch
-                batch = createNodeBatch(ingredientName, expiration, quantity);
+                batch = createNodeBatch(expiration, quantity);
                 //inserisco Batch nel magazzino (hash table)
-                insertBatchInHashTable(&table, batch, currentTime);
+                insertBatchInHashTable(&table, batch, currentTime, ingredientName);
                 free(ingredientName);
                 batch = NULL;
                 //free(batch->ingredient);
