@@ -483,7 +483,7 @@ void insertRecipeInHashTable(RecipeHashTable** table, Recipe* newRecipe) {
         }
 
         //controllo se la key della cella è uguale a ingredientKey
-        if (hash_strcmp((*table) -> items[tryIndex] -> name, ingredientKey) == 0) {
+        if (strcmp((*table) -> items[tryIndex] -> name, ingredientKey) == 0) {
 
             //controllo se la cella è stata cancellata
             if ((*table)->items[tryIndex]->isDeleted) {
@@ -644,7 +644,7 @@ void insertItemInHashTable(HashTable** table, int currentTime, Node* ingredientN
         }
 
         //controllo se la key della cella è uguale a ingredientKey
-        if (hash_strcmp((*table) -> items[tryIndex] -> ingredientKey, ingredientKey) == 0) {
+        if (strcmp((*table) -> items[tryIndex] -> ingredientKey, ingredientKey) == 0) {
 
             //se la cella non è stata cancellata devo inserire il nuovo batch nella lista interna
             //Batch* headBatch = (*table) -> items[tryIndex] -> list;
@@ -916,7 +916,7 @@ Recipe* checkIfRecipeIsPresentInHashTable(char* ingredientKey, RecipeHashTable**
         }
 
         //controllo se la key della cella è uguale a ingredientKey
-        if (hash_strcmp((*table) -> items[tryIndex] -> name, ingredientKey) == 0) {
+        if (strcmp((*table) -> items[tryIndex] -> name, ingredientKey) == 0) {
 
             //controllo se la cella è stata cancellata
             if ((*table)->items[tryIndex]->isDeleted) {
@@ -1205,7 +1205,7 @@ bool checkIfRecipeIsPresentInReadyQueue(Queue* readyQueue, char* recipeName) {
 
     Order* currentOrder = readyQueue -> head;
     while (currentOrder != NULL) {
-        if(hash_strcmp(currentOrder -> recipe -> name, recipeName) == 0) {
+        if(strcmp(currentOrder -> recipe -> name, recipeName) == 0) {
             //ricetta presente nella queue di ordini in attesa
             return true;
         }
@@ -1331,7 +1331,7 @@ void removeRecipeFromHashTable(RecipeHashTable** table, char* recipeName) {
         }
 
         //controllo se la key della cella è uguale a ingredientKey
-        if (hash_strcmp((*table) -> items[tryIndex] -> name, recipeName) == 0) {
+        if (strcmp((*table) -> items[tryIndex] -> name, recipeName) == 0) {
 
             //controllo se la cella è stata cancellata
             if ((*table)->items[tryIndex]->isDeleted) {
