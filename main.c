@@ -656,9 +656,6 @@ void insertItemInHashTable(HashTable** table, int currentTime, Node* ingredientN
     }
 }
 
-int periodicity = 0;
-int lastTimeRifornimento = 0;
-
 void insertBatchInHashTable(HashTable** table, Batch* newBatch, int currentTime, char* ingredientKey) {
 
     //se il batch è scaduto non lo inserisco
@@ -1224,14 +1221,14 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, HashTable** listOfLists, 
     Order* next = NULL;
     int result;
     bool flag = true;
-    int condition = currentTime - periodicity;
+    //int condition = currentTime - periodicity;
 
     while (currentOrder != NULL) {
         //itero sugli ingredienti e controllo con checkIfIngredientIsPresentInWarehouse se sono tutti presenti
         //se sono tutti presenti sposto l'ordine in readyQueue e rimuovo gli ingredienti dal magazzino
         flag = true;
 
-        if(last != NULL || lastTimeRifornimento <= condition) {
+        if(last != NULL) {
             if(currentOrder -> recipe -> state == -1 && currentOrder -> recipe -> lastTimeUpdated == currentTime) {
                 last = currentOrder;
                 currentOrder = currentOrder -> next;
@@ -1459,6 +1456,7 @@ void UTILS_commandsHandler() {
     Order* order = NULL;
     Batch* batch = NULL;
     int capacity = 0;
+    int periodicity = 0;
     int currentTime = 0;
     Recipe* recipe = NULL;
     //size_t length;
@@ -1552,7 +1550,7 @@ void UTILS_commandsHandler() {
             //controllo se gli ordini in attesa possono essere preparati
             prepareOrder(waitQueue, readyQueue, &table, currentTime);
             printf("rifornito\n");
-            lastTimeRifornimento = currentTime;
+            //lastTimeRifornimento = currentTime;
             break;
         case ordine_HASH:
             commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
