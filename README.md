@@ -37,9 +37,12 @@ The official grader assigns a band only when **both** thresholds are met at once
 | 27 | 20 MiB | 6 s | ✅ |
 | **30** | **15 MiB** | **4 s** | **✅** |
 
-On the grader the submitted version ran in about **2 seconds** using **around 10 MiB** of memory — half the time limit
-and two thirds of the memory limit of the top band. All 12 public test cases produce byte-identical output, and the binary compiles clean
-under `-Wall -Werror`. Memory behaviour was tracked with Valgrind during development, since peak usage is half the grade.
+On the official grader the submitted version ran in **2.79 s** using **12.7 MiB** — inside the top band on both
+axes. The commit history records that measurement at every optimization step, from grade 21 (11.21 s / 19.4 MiB)
+through 27 (5.76 s / 16.9 MiB) to 30.
+
+All 12 public test cases produce byte-identical output, the binary compiles clean under `-Wall -Werror`, and it runs
+free of leaks and invalid accesses under Valgrind.
 
 ---
 
@@ -193,7 +196,8 @@ Table growth is `O(n)` per resize, `O(1)` amortized per insertion.
 [`tests/`](tests) holds the 12 public cases — every `openN.txt` input with its expected `openN.output.txt`, from a
 few kilobytes up to 24 MB. [`run_tests.sh`](run_tests.sh) builds and diffs all of them in one command.
 
-Memory correctness was checked with Valgrind throughout, since peak memory is half the grade:
+Memory correctness was checked with Valgrind throughout — peak memory is half the grade, so leaks are not a
+cosmetic concern here:
 
 ```bash
 valgrind --leak-check=full --show-leak-kinds=all ./proapi < tests/open4.txt > /dev/null
