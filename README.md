@@ -7,6 +7,24 @@ Final project for the **Algoritmi e Principi dell'Informatica** (API) course, Po
 
 ---
 
+## Grading
+
+The grade depends exclusively on **execution time** and **memory usage** on the large test cases: a band is awarded
+only when **both** thresholds are met at the same time.
+
+| Grade | Memory | Time | Result |
+|---|---|---|---|
+| 18 | 35 MiB | 14 s | ✅ |
+| 21 | 30 MiB | 11 s | ✅ |
+| 24 | 25 MiB | 9 s | ✅ |
+| 27 | 20 MiB | 6 s | ✅ |
+| **30** | **15 MiB** | **4 s** | **✅** |
+
+Every threshold cleared, up to the top band: **30/30**. The submitted version ran the grader's test cases in about
+**2 seconds**, using **under 14 MiB** of memory — comfortably inside the top band on both axes.
+
+---
+
 ## The problem
 
 A discrete-time simulation of an industrial pastry shop. Every command read from `stdin` consumes one time instant;
@@ -170,27 +188,27 @@ gcc -Wall -Werror -std=gnu11 -g3 -O2 main.c -o proapi -lm
 The program reads from `stdin` and writes to `stdout`:
 
 ```bash
-./proapi < open4.txt > out.txt
+./proapi < tests/open4.txt > out.txt
 ```
 
 Comparing against the expected output:
 
 ```bash
-diff <(./proapi < open4.txt) "test_cases_pubblici copia/open4.output.txt"
+diff <(./proapi < tests/open4.txt) tests/open4.output.txt
 ```
 
 ---
 
 ## Testing and debugging
 
-- **Public test cases**: the `test_cases_pubblici copia/` and `test_cases_pubblici_CLION/` folders contain the inputs
-  (`openN.txt`) with their expected outputs (`openN.output.txt`), from the small cases (`open1`) up to the
+- **Public test cases**: the [`tests/`](tests) folder holds every input (`openN.txt`) with its expected output
+  (`openN.output.txt`), from the small cases (`open1`, plus the `example` from the assignment) up to the
   tens-of-megabytes ones (`open9`, `open10`, `open11`) used to measure time and memory.
 - **Valgrind** for debugging: used both for memory correctness (memcheck) and to confirm the absence of leaks, since
   the score depends directly on peak memory.
 
 ```bash
-valgrind --leak-check=full --show-leak-kinds=all ./proapi < open4.txt > /dev/null
+valgrind --leak-check=full --show-leak-kinds=all ./proapi < tests/open4.txt > /dev/null
 ```
 
 On termination the program explicitly frees every structure (`freeHashTable`, `freeRecipeInHashTable`, `freeOrders`,
@@ -199,34 +217,16 @@ and verifiable.
 
 ---
 
-## Grading
-
-The grade depends exclusively on **execution time** and **memory usage** on the large test cases: a band is awarded
-only when **both** thresholds are met at the same time.
-
-| Grade | Memory | Time | Result |
-|---|---|---|---|
-| 18 | 35 MiB | 14 s | ✅ |
-| 21 | 30 MiB | 11 s | ✅ |
-| 24 | 25 MiB | 9 s | ✅ |
-| 27 | 20 MiB | 6 s | ✅ |
-| **30** | **15 MiB** | **4 s** | **✅** |
-
-Every threshold cleared, up to the top band: **30/30**.
-
----
-
 ## Repository layout
 
 ```
-main.c                        complete implementation
-CMakeLists.txt                CMake configuration (target Progetto_API)
-compiler_flag.cmake           compiler flags used for grading
-specifica.pdf                 official assignment text (Italian)
-test_cases_pubblici copia/    public test cases with expected outputs
-test_cases_pubblici_CLION/    same tests, laid out for running from CLion
-open*.txt / output*.txt       working inputs and outputs used during development
-LICENSE                       MIT license
+main.c                  complete implementation (single translation unit)
+CMakeLists.txt          CMake configuration (target Progetto_API)
+compiler_flag.cmake     compiler flags used for grading
+specifica.pdf           official assignment text (Italian)
+tests/                  public test cases: openN.txt inputs + openN.output.txt expected outputs
+README.md               this file
+LICENSE                 MIT license
 ```
 
 ---
