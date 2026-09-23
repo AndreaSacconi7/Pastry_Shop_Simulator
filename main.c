@@ -1136,7 +1136,6 @@ void prepareOrder(Queue* waitQueue, Queue* readyQueue, HashTable** listOfLists, 
                 currentOrder -> recipe -> state = -1;
                 currentOrder -> recipe -> lastTimeUpdated = currentTime;
             }else{
-                //result == -2
                 if(last != NULL)
                     waitQueue -> tail = last;
                 else
@@ -1238,7 +1237,6 @@ void selectOrderToPutInVan(int capacity, Queue* readyQueue) {
 
     int vanCapacity = capacity;
     Order* currentOrder = readyQueue -> head;
-    //Order* last = NULL;
     Order* next = NULL;
 
     while (currentOrder != NULL && vanCapacity > 0) {
@@ -1347,7 +1345,6 @@ void UTILS_commandsHandler() {
                 //creo Recipe
                 recipe = createRecipe(recipeName);
                 while ((commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER)) != NULL) {
-                    //commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
                     ingredientName = strndup(commandArgumentHolder, 257);
                     commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
                     quantity = atoi(commandArgumentHolder);
@@ -1377,8 +1374,6 @@ void UTILS_commandsHandler() {
         case rifornimento_HASH:
             while ((commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER)) != NULL) {
                 ingredientName = strndup(commandArgumentHolder, 257);
-                //if(commandArgumentHolder[length] == '\0')
-                 //   printf("---------COMMANDARGOMENT HA il terminatore VALE %c, %c\n", commandArgumentHolder[length-1], commandArgumentHolder[length]);
                 commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
                 quantity = atoi(commandArgumentHolder);
                 commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
@@ -1390,11 +1385,9 @@ void UTILS_commandsHandler() {
                 free(ingredientName);
                 batch = NULL;
             }
-            //printHashTable(listOfLists);
             //controllo se gli ordini in attesa possono essere preparati
             prepareOrder(waitQueue, readyQueue, &table, currentTime);
             printf("rifornito\n");
-            //lastTimeRifornimento = currentTime;
             break;
         case ordine_HASH:
             commandArgumentHolder = strtok(NULL, COMMAND_ARGUMENTS_DELIMITER);
