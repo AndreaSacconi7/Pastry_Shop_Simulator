@@ -13,7 +13,7 @@ Final project for *Algoritmi e Principi dell'Informatica* at **Politecnico di Mi
 awarded purely on **execution time and peak memory** against a reference test suite, which makes it an exercise in
 engineering for constant factors, not just asymptotics.
 
-**Result: 30/30** — the top band, cleared with roughly 2× headroom on time and memory.
+**Result: 30/30** — the top band, cleared with headroom on both time and memory.
 
 ---
 
@@ -37,9 +37,9 @@ The official grader assigns a band only when **both** thresholds are met at once
 | 27 | 20 MiB | 6 s | ✅ |
 | **30** | **15 MiB** | **4 s** | **✅** |
 
-On the grader the submitted version ran in about **2 seconds** and stayed **under 14 MiB**, comfortably inside the
-top band on both axes. All 12 public test cases produce byte-identical output and the binary compiles clean under `-Wall -Werror`.
-Memory behaviour was tracked with Valgrind during development, since peak usage is half the grade.
+On the grader the submitted version ran in about **2 seconds** using **around 10 MiB** of memory — half the time limit
+and two thirds of the memory limit of the top band. All 12 public test cases produce byte-identical output, and the binary compiles clean
+under `-Wall -Werror`. Memory behaviour was tracked with Valgrind during development, since peak usage is half the grade.
 
 ---
 

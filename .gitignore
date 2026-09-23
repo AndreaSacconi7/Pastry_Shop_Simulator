@@ -4,3 +4,4 @@ build/
 proapi
 proapi.dSYM/
 output*.txt
+.idea/
